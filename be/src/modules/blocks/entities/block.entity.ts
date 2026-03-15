@@ -6,8 +6,8 @@ import {
 	PrimaryGeneratedColumn,
 	UpdateDateColumn,
 } from "typeorm";
+import { Apartment } from "../../apartments/entities/apartment.entity";
 import { BlockStatus } from "../enums/block-status.enum";
-// import { Apartment } from '../../apartments/entities/apartment.entity';
 
 @Entity("blocks")
 export class Block {
@@ -36,8 +36,11 @@ export class Block {
 	@Column({ type: "boolean", default: true, name: "is_active" })
 	isActive: boolean;
 
-	// @OneToMany(() => Apartment, (apartment) => apartment.block)
-	// apartments: Apartment[];
+	@OneToMany(
+		() => Apartment,
+		(apartment) => apartment.block,
+	)
+	apartments: Apartment[];
 
 	@CreateDateColumn({ name: "created_at" })
 	createdAt: Date;
