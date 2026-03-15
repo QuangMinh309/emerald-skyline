@@ -4,6 +4,7 @@
     "paths": {
       "src/*": ["src/*"]
     },
+    "types": ["node", "multer", "streamifier"],
     "module": "nodenext",
     "moduleResolution": "nodenext",
     "resolvePackageJsonExports": true,

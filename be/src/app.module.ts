@@ -6,6 +6,7 @@ import { AppService } from "./app.service";
 import getDatabaseConfig from "./configs/database.config";
 import { AccountsModule } from "./modules/accounts/accounts.module";
 import { AuthModule } from "./modules/auth/auth.module";
+import { CloudinaryModule } from "./modules/cloudinary/cloudinary.module";
 import { MailerModule } from "./modules/mailer/mailer.module";
 
 @Module({
@@ -21,6 +22,7 @@ import { MailerModule } from "./modules/mailer/mailer.module";
 		AuthModule,
 		AccountsModule,
 		MailerModule,
+		CloudinaryModule,
 	],
 	controllers: [AppController],
 	providers: [AppService],
