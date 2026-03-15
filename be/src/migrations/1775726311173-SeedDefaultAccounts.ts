@@ -1,0 +1,26 @@
+import { hashSync } from "bcrypt";
+import { MigrationInterface, QueryRunner } from "typeorm";
+
+export class SeedDefaultAccounts1704370000000 implements MigrationInterface {
+	public async up(queryRunner: QueryRunner): Promise<void> {
+		const adminPassword = hashSync("admin123", 10);
+		const residentPassword = hashSync("resident123", 10);
+		const technicianPassword = hashSync("technician123", 10);
+
+		await queryRunner.query(`
+      INSERT INTO accounts (email, password, role, is_active, created_at, updated_at)
+      VALUES 
+        ('admin@gmail.com', '${adminPassword}', 'ADMIN', true, NOW(), NOW()),
+        ('resident@gmail.com', '${residentPassword}', 'RESIDENT', true, NOW(), NOW()),
+        ('technician@gmail.com', '${technicianPassword}', 'TECHNICIAN', true, NOW(), NOW())
+      ON CONFLICT (email) DO NOTHING;
+    `);
+	}
+
+	public async down(queryRunner: QueryRunner): Promise<void> {
+		await queryRunner.query(`
+      DELETE FROM accounts 
+      WHERE email IN ('admin@gmail.com', 'resident@gmail.com', 'technician@gmail.com');
+    `);
+	}
+}

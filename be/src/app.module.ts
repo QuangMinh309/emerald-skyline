@@ -5,17 +5,22 @@ import { AppController } from "./app.controller";
 import { AppService } from "./app.service";
 import getDatabaseConfig from "./configs/database.config";
 import { AccountsModule } from "./modules/accounts/accounts.module";
+import { AuthModule } from "./modules/auth/auth.module";
+import { MailerModule } from "./modules/mailer/mailer.module";
 
 @Module({
 	imports: [
 		ConfigModule.forRoot({
 			isGlobal: true,
+			envFilePath: ".env",
 		}),
 		TypeOrmModule.forRootAsync({
 			inject: [ConfigService],
 			useFactory: getDatabaseConfig,
 		}),
+		AuthModule,
 		AccountsModule,
+		MailerModule,
 	],
 	controllers: [AppController],
 	providers: [AppService],
