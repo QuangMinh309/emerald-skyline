@@ -1,6 +1,7 @@
 import type { TableColumn } from "@/types";
+import type { Maintenance } from "@/types/maintenance";
 
-export const maintenanceColumns: TableColumn<any>[] = [
+export const maintenanceColumns: TableColumn<Maintenance>[] = [
 	{
 		key: "maintenanceDate",
 		label: "Ngày bảo trì",

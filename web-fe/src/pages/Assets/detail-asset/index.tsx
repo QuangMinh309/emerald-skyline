@@ -1,17 +1,13 @@
-import CustomTable from "@/components/common/CustomTable";
 import PageHeader from "@/components/common/PageHeader";
-import { SearchBar } from "@/components/common/SearchBar";
 import Spinner from "@/components/common/Spinner";
 import StatusBadge from "@/components/common/StatusBadge";
 import { MaintenanceTimeline } from "@/components/common/MaintenanceTimeline";
 import { Button } from "@/components/ui/button";
 import { useGetAssetById } from "@/hooks/data/useAssests";
 import DeleteAsset from "@/pages/Assets/delete-asset";
-import { maintenanceColumns } from "@/pages/Assets/detail-asset/columns";
 import UpdateAssetModal from "@/pages/Assets/update-asset";
-import { normalizeString } from "@/utils/string";
 import { Edit, Trash2 } from "lucide-react";
-import { useMemo, useState } from "react";
+import { useState } from "react";
 import { useParams } from "react-router-dom";
 const statusMap: Record<
 	string,

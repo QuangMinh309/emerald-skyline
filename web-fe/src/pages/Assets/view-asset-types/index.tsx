@@ -1,5 +1,5 @@
 import { useState, useMemo } from "react";
-import { Plus, Printer, FileDown, Trash2 } from "lucide-react";
+import { Printer, FileDown, Trash2 } from "lucide-react";
 import PageHeader from "@/components/common/PageHeader";
 import ActionDropdown from "@/components/common/ActionDropdown";
 import CustomTable from "@/components/common/CustomTable";
