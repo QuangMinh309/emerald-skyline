@@ -29,11 +29,6 @@ const PopConfirm = ({
 	titleClassName,
 	buttonClassName,
 }: PopConfirmProps) => {
-	const handleConfirmAction = () => {
-		handleConfirm();
-		setOpen(false);
-	};
-
 	return (
 		<>
 			<AlertDialog open={open} onOpenChange={setOpen}>

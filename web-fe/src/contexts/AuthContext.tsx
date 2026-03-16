@@ -1,11 +1,7 @@
 import type { ReactNode } from "react";
 import { createContext, useContext, useEffect, useMemo, useState } from "react";
 import type { AuthUser } from "@/types/auth";
-import {
-	getProfile,
-	login as loginRequest,
-	logout as logoutRequest,
-} from "@/services/auth.service";
+import { getProfile, logout as logoutRequest } from "@/services/auth.service";
 import {
 	clearAuthStorage,
 	getAccessToken,

@@ -80,7 +80,7 @@ export const MaintenanceTimeline = ({ history }: MaintenanceTimelineProps) => {
 			{/* Vertical line */}
 			<div className="absolute left-6 top-0 bottom-0 w-0.5 bg-gray-200" />
 
-			{history.map((item, index) => {
+			{history.map((item) => {
 				const config = getStatusConfig(item.status);
 				const Icon = config.icon;
 
