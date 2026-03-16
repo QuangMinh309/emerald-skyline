@@ -1,6 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { getProvinces, getProvinceDetails } from "@/services/location.service";
-import type { Province, Ward } from "@/types/location";
+import type { Province } from "@/types/location";
 
 export const useProvinces = () => {
 	return useQuery<Province[]>({

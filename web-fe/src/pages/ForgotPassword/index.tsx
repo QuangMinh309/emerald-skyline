@@ -34,7 +34,7 @@ export default function ForgotPasswordPage() {
 		},
 	});
 
-	async function handleSubmit(values: ForgotPasswordValues) {
+	async function handleSubmit() {
 		setIsSubmitting(true);
 		try {
 			// TODO: Gọi API quên mật khẩu
