@@ -29,7 +29,6 @@ const DetailAssetPage = () => {
 		label: asset?.status ?? "Unknown",
 		type: "default",
 	};
-	const [search, setSearch] = useState("");
 
 	// const { data, isLoading, isError, refetch } = useGetMaintenanceTicketById(
 	//   Number(id)
@@ -136,7 +135,7 @@ const DetailAssetPage = () => {
 							<div>
 								<h3 className="display-label">Chu kỳ bảo trì (tháng)</h3>
 								<p className="display-text">
-									{asset?.timeline.maintenanceIntervalMonths > 0
+									{(asset?.timeline.maintenanceIntervalMonths ?? 0 > 0)
 										? `${asset?.timeline.maintenanceIntervalMonths} tháng`
 										: "Không có"}
 								</p>
