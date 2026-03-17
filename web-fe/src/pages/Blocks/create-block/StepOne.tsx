@@ -24,11 +24,7 @@ import {
 	handleImportApartments,
 	clearImportedData,
 } from "@/store/slices/actionBlockSlice";
-import {
-	downloadSampleFile,
-	parseImportedFile,
-	type ImportedApartment,
-} from "@/utils/apartmentImport";
+import { downloadSampleFile, parseImportedFile } from "@/utils/apartmentImport";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { FileDown, Upload, X } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
@@ -274,6 +270,7 @@ const StepOne = ({ setStep }: StepOneProps) => {
 										onChange={handleFileChange}
 										className="hidden"
 										id="apartment-file-input"
+										title="Import apartment data from Excel file"
 									/>
 									<Button
 										type="button"

@@ -1,4 +1,5 @@
 import { Button } from "@/components/ui/button";
+import type { BlockStatusType } from "@/constants/blockStatus";
 import { useCreateBlock } from "@/hooks/data/useBlocks";
 import { BlockCard } from "@/pages/Blocks/view-blocks";
 import { useAppDispatch, useAppSelector } from "@/store/hooks";
@@ -63,7 +64,7 @@ const StepThree = ({ setStep }: StepThreeProps) => {
 						managerPhone: value.managerPhone,
 						totalFloors: value.totalFloors,
 						totalRooms: value.apartments.length,
-						status: value.status,
+						status: value.status as BlockStatusType,
 						roomDetails: {
 							studio: studio,
 							oneBedroom: oneBedroom,

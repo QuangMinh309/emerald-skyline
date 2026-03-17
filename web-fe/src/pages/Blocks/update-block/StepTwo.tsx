@@ -13,7 +13,7 @@ interface StepTwoProps {
 	blockId: number;
 }
 
-const StepTwo = ({ setStep, blockId }: StepTwoProps) => {
+const StepTwo = ({ setStep }: StepTwoProps) => {
 	const value = useAppSelector((state) => state.actionBlock);
 	const dispatch = useAppDispatch();
 	const [apartments, setApartments] = useState<Apartment[]>([]);

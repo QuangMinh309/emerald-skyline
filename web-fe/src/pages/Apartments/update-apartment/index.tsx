@@ -29,7 +29,7 @@ import { useResidents } from "@/hooks/data/useResidents";
 import { toast } from "sonner";
 import { useEffect, useMemo, useState } from "react";
 import { Button } from "@/components/ui/button";
-import { Check, X, Loader2 } from "lucide-react";
+import { Check, X } from "lucide-react";
 import { Label } from "@/components/ui/label";
 import {
 	Popover,
