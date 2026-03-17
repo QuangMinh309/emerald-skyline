@@ -3,7 +3,7 @@ import { Navigate, createBrowserRouter } from "react-router-dom";
 import MainLayout from "@components/layout/MainLayout";
 import ProtectedRoute from "@/components/auth/ProtectedRoute";
 import RoleBasedRoute from "@/components/auth/RoleBasedRoute";
-// import DetailAssetPage from "@/pages/Assets/detail-asset";
+import DetailAssetPage from "@/pages/Assets/detail-asset";
 // import ResidentsPage from "@/pages/Residents/view-residents";
 // import DetailResidentPage from "@/pages/Residents/detail-resident";
 // import BlocksPage from "@/pages/Blocks/view-blocks";
@@ -29,7 +29,7 @@ import RoleBasedRoute from "@/components/auth/RoleBasedRoute";
 import AccountsPage from "@/pages/Accounts/view-accounts";
 import DetailAccountPage from "@/pages/Accounts/detail-account";
 
-// const Assets = lazy(() => import("@/pages/Assets/view-assets"));
+const Assets = lazy(() => import("@/pages/Assets/view-assets"));
 // const Notifications = lazy(
 // 	() => import("@/pages/Notifications/view-notifications"),
 // );
@@ -62,22 +62,22 @@ export const routes = createBrowserRouter([
 			{ index: true, element: <Navigate to="/blocks" replace /> },
 
 			// Assets - ADMIN only
-			// {
-			// 	path: "assets",
-			// 	element: (
-			// 		<RoleBasedRoute allowedRoles={["ADMIN"]}>
-			// 			<Assets />
-			// 		</RoleBasedRoute>
-			// 	),
-			// },
-			// {
-			// 	path: "assets/:id",
-			// 	element: (
-			// 		<RoleBasedRoute allowedRoles={["ADMIN"]}>
-			// 			<DetailAssetPage />
-			// 		</RoleBasedRoute>
-			// 	),
-			// },
+			{
+				path: "assets",
+				element: (
+					<RoleBasedRoute allowedRoles={["ADMIN"]}>
+						<Assets />
+					</RoleBasedRoute>
+				),
+			},
+			{
+				path: "assets/:id",
+				element: (
+					<RoleBasedRoute allowedRoles={["ADMIN"]}>
+						<DetailAssetPage />
+					</RoleBasedRoute>
+				),
+			},
 
 			// // Notifications - ADMIN & TECHNICIAN
 			// {
