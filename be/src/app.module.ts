@@ -8,6 +8,7 @@ import { AccountsModule } from "./modules/accounts/accounts.module";
 import { AuthModule } from "./modules/auth/auth.module";
 import { CloudinaryModule } from "./modules/cloudinary/cloudinary.module";
 import { MailerModule } from "./modules/mailer/mailer.module";
+import { ResidentsModule } from "./modules/residents/residents.module";
 import { SupabaseStorageModule } from "./modules/supabase-storage/supabase-storage.module";
 
 @Module({
@@ -25,6 +26,7 @@ import { SupabaseStorageModule } from "./modules/supabase-storage/supabase-stora
 		MailerModule,
 		CloudinaryModule,
 		SupabaseStorageModule,
+		ResidentsModule,
 	],
 	controllers: [AppController],
 	providers: [AppService],
