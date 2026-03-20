@@ -30,6 +30,48 @@ jobs:
         # Thêm --since=main để tường minh
         run: biome ci --changed --since=main --no-errors-on-unmatched .
 
+  build-backend:
+    name: Build NestJS Backend
+    needs: code-quality # check format và lint trước khi build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js (Version 22)
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+          cache-dependency-path: be/package-lock.json
+
+      - name: Install Backend Deps
+        run: cd be && npm ci
+
+      - name: Build Backend
+        run: cd be && npm run build
+
+  build-frontend:
+    name: Build React Web
+    needs: code-quality
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js (Version 22)
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+          cache-dependency-path: web-fe/package-lock.json
+
+      - name: Install Frontend Deps
+        run: cd web-fe && npm ci
+
+      - name: Build Frontend
+        run: cd web-fe && npm run build
+
   # Job Test (Khi nào viết test case thì mở ra dùng)
   # test:
   #   name: Run Tests
