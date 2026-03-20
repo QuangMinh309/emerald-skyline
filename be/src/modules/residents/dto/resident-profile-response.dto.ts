@@ -1,7 +1,7 @@
 import { ApiProperty } from "@nestjs/swagger";
 import { Exclude, Expose, Type } from "class-transformer";
-import { ApartmentType } from "../../apartments/enums/apartment-type.enum";
-import { PaymentResponseDto } from "../../payments/dto/payment-response.dto";
+// import { ApartmentType } from "../../apartments/enums/apartment-type.enum";
+// import { PaymentResponseDto } from "../../payments/dto/payment-response.dto";
 import { Gender } from "../enums/gender.enum";
 
 class BlockInfoDto {
@@ -27,9 +27,9 @@ class ApartmentDetailDto {
 	@Expose()
 	floor: number;
 
-	@ApiProperty({ example: "STUDIO", enum: ApartmentType })
-	@Expose()
-	type: ApartmentType;
+	// @ApiProperty({ example: "STUDIO", enum: ApartmentType })
+	// @Expose()
+	// type: ApartmentType;
 
 	@ApiProperty({ example: 85.5 })
 	@Expose()
@@ -228,13 +228,13 @@ export class ResidentProfileResponseDto {
 	@Type(() => BookingProfileDto)
 	bookings: BookingProfileDto[];
 
-	@ApiProperty({
-		type: [PaymentResponseDto],
-		description: "List of payment transactions for this resident",
-	})
-	@Expose()
-	@Type(() => PaymentResponseDto)
-	payments: PaymentResponseDto[];
+	// @ApiProperty({
+	// 	type: [PaymentResponseDto],
+	// 	description: "List of payment transactions for this resident",
+	// })
+	// @Expose()
+	// @Type(() => PaymentResponseDto)
+	// payments: PaymentResponseDto[];
 
 	@ApiProperty({
 		example: "2024-01-01T00:00:00Z",

@@ -9,7 +9,7 @@ import {
 	UpdateDateColumn,
 } from "typeorm";
 import { Account } from "../../accounts/entities/account.entity";
-import { ApartmentResident } from "../../apartments/entities/apartment-resident.entity";
+// import { ApartmentResident } from "../../apartments/entities/apartment-resident.entity";
 import { Gender } from "../enums/gender.enum";
 
 @Entity("residents")
@@ -71,9 +71,9 @@ export class Resident {
 	@UpdateDateColumn({ name: "updated_at" })
 	updatedAt: Date;
 
-	@OneToMany(
-		() => ApartmentResident,
-		(ar) => ar.resident,
-	)
-	apartmentResidents: ApartmentResident[];
+	// @OneToMany(
+	// 	() => ApartmentResident,
+	// 	(ar) => ar.resident,
+	// )
+	// apartmentResidents: ApartmentResident[];
 }
