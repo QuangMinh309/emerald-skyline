@@ -9,6 +9,26 @@ on:
     branches: ["main"]
 
 jobs:
+  # Kiểm tra xem folder nào thay đổi
+  changes:
+    runs-on: ubuntu-latest
+    outputs:
+      be: ${{ steps.filter.outputs.be }}
+      web: ${{ steps.filter.outputs.web }}
+      mobile: ${{ steps.filter.outputs.mobile }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dorny/paths-filter@v3
+        id: filter
+        with:
+          filters: |
+            be:
+              - 'be/**'
+            web:
+              - 'web-fe/**'
+            mobile:
+              - 'mobile-fe/**'
+
   # Tự động gán nhãn phân loại service
   labeler:
     name: Auto Label PR
@@ -43,7 +63,8 @@ jobs:
 
   build-backend:
     name: Build NestJS Backend
-    needs: code-quality # Check format và lint trước khi build
+    needs: [changes, code-quality] # Check format và lint, đảm bảo có thay đổi trước khi build
+    if: ${{ needs.changes.outputs.be == 'true' }}
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
@@ -69,7 +90,8 @@ jobs:
 
   build-frontend:
     name: Build React Web
-    needs: code-quality
+    needs: [changes, code-quality]
+    if: ${{ needs.changes.outputs.web == 'true' }}
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
@@ -96,7 +118,8 @@ jobs:
   # Type-Check Mobile (React Native)
   check-mobile:
     name: Type Check Mobile
-    needs: code-quality
+    needs: [changes, code-quality]
+    if: ${{ needs.changes.outputs.mobile == 'true' }}
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
