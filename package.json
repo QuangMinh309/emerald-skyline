@@ -1,0 +1,32 @@
+{
+  "name": "emerald-skyline",
+  "version": "1.0.0",
+  "description": "<div align=\"center\">\r   <img src=\"https://img.shields.io/badge/React-20232A?style=for-the-badge&logo=react&logoColor=61DAFB\" alt=\"React\" />\r   <img src=\"https://img.shields.io/badge/NestJS-E0234E?style=for-the-badge&logo=nestjs&logoColor=white\" alt=\"NestJS\" />\r   <img src=\"https://img.shields.io/badge/React_Native-20232A?style=for-the-badge&logo=react&logoColor=61DAFB\" alt=\"React Native\" />\r   <img src=\"https://img.shields.io/badge/Python-3776AB?style=for-the-badge&logo=python&logoColor=white\" alt=\"Python\" />\r   <img src=\"https://img.shields.io/badge/PostgreSQL-316192?style=for-the-badge&logo=postgresql&logoColor=white\" alt=\"PostgreSQL\" />\r </div>",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "prepare": "husky"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/QuangMinh309/emerald-skyline.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "bugs": {
+    "url": "https://github.com/QuangMinh309/emerald-skyline/issues"
+  },
+  "homepage": "https://github.com/QuangMinh309/emerald-skyline#readme",
+  "devDependencies": {
+    "@biomejs/biome": "^2.4.8",
+    "husky": "^9.1.7",
+    "lint-staged": "^16.4.0"
+  },
+  "lint-staged": {
+    "*.{js,ts,jsx,tsx,json}": [
+      "biome check --write --no-errors-on-unmatched"
+    ]
+  }
+}

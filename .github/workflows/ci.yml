@@ -1,0 +1,42 @@
+name: Emerald Skyline CI
+
+on:
+  push:
+    branches: ["main"]
+  pull_request:
+    branches: ["main"]
+
+jobs:
+  code-quality:
+    name: Check Code Quality (Biome)
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # Bắt buộc phải có để Biome tính toán được file nào vừa bị change
+
+      - name: Setup Biome
+        uses: biomejs/setup-biome@v2
+        with:
+          version: latest
+
+      - name: Run Biome check (CI mode)
+        run: biome ci --changed .
+
+  # Job Test (Khi nào nhóm viết test case thì mở ra dùng)
+  # test:
+  #   name: Run Tests
+  #   needs: code-quality
+  #   runs-on: ubuntu-latest
+  #   steps:
+  #     - uses: actions/checkout@v4
+  #     - uses: actions/setup-node@v4
+  #       with:
+  #         node-version: '20'
+  #         cache: 'npm'
+  #     - name: Test backend
+  #       run: cd be && npm ci && npm run test
