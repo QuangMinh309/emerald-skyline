@@ -1,4 +1,6 @@
 name: Emerald Skyline CI
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 
 on:
   push:
@@ -25,9 +27,10 @@ jobs:
           version: latest
 
       - name: Run Biome check (CI mode)
-        run: biome ci --changed .
+        # Thêm --since=main để tường minh
+        run: biome ci --changed --since=main .
 
-  # Job Test (Khi nào nhóm viết test case thì mở ra dùng)
+  # Job Test (Khi nào viết test case thì mở ra dùng)
   # test:
   #   name: Run Tests
   #   needs: code-quality
