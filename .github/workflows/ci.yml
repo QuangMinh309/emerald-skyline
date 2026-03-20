@@ -9,6 +9,17 @@ on:
     branches: ["main"]
 
 jobs:
+  # Tự động gán nhãn phân loại service
+  labeler:
+    name: Auto Label PR
+    permissions:
+      contents: read
+      pull-requests: write
+    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request'
+    steps:
+      - uses: actions/labeler@v5
+
   code-quality:
     name: Check Code Quality (Biome)
     runs-on: ubuntu-latest
@@ -32,7 +43,7 @@ jobs:
 
   build-backend:
     name: Build NestJS Backend
-    needs: code-quality # check format và lint trước khi build
+    needs: code-quality # Check format và lint trước khi build
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
@@ -41,8 +52,8 @@ jobs:
       - name: Setup Node.js (Version 22)
         uses: actions/setup-node@v4
         with:
-          node-version: '22'
-          cache: 'npm'
+          node-version: "22"
+          cache: "npm"
           cache-dependency-path: be/package-lock.json
 
       - name: Install Backend Deps
@@ -50,6 +61,11 @@ jobs:
 
       - name: Build Backend
         run: cd be && npm run build
+
+      - name: Size Monitor
+        run: |
+          echo "### Backend Build Size" >> $GITHUB_STEP_SUMMARY
+          du -sh be/dist >> $GITHUB_STEP_SUMMARY
 
   build-frontend:
     name: Build React Web
@@ -62,8 +78,8 @@ jobs:
       - name: Setup Node.js (Version 22)
         uses: actions/setup-node@v4
         with:
-          node-version: '22'
-          cache: 'npm'
+          node-version: "22"
+          cache: "npm"
           cache-dependency-path: web-fe/package-lock.json
 
       - name: Install Frontend Deps
@@ -71,6 +87,34 @@ jobs:
 
       - name: Build Frontend
         run: cd web-fe && npm run build
+
+      - name: Size Monitor
+        run: |
+          echo "### Web Build Size" >> $GITHUB_STEP_SUMMARY
+          (du -sh web-fe/dist || du -sh web-fe/build) >> $GITHUB_STEP_SUMMARY
+
+  # Type-Check Mobile (React Native)
+  check-mobile:
+    name: Type Check Mobile
+    needs: code-quality
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js (Version 22)
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: "npm"
+          cache-dependency-path: mobile-fe/package-lock.json
+
+      - name: Install Deps
+        run: cd mobile-fe && npm ci
+
+      - name: Type Check
+        # Lệnh này kiểm tra lỗi TypeScript mà không cần build APK
+        run: cd mobile-fe && npx tsc --noEmit
 
   # Job Test (Khi nào viết test case thì mở ra dùng)
   # test:
@@ -81,7 +125,7 @@ jobs:
   #     - uses: actions/checkout@v4
   #     - uses: actions/setup-node@v4
   #       with:
-  #         node-version: '20'
+  #         node-version: '22'
   #         cache: 'npm'
   #     - name: Test backend
   #       run: cd be && npm ci && npm run test

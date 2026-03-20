@@ -1,0 +1,13 @@
+# Cấu hình luật gán nhãn
+backend:
+  - be/**/*
+web:
+  - web-fe/**/*
+mobile:
+  - mobile-fe/**/*
+ai:
+  - ai/**/*
+documentation:
+  - "**/README.md"
+ci-cd:
+  - .github/workflows/**/*
