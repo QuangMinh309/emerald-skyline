@@ -28,7 +28,7 @@ jobs:
 
       - name: Run Biome check (CI mode)
         # Thêm --since=main để tường minh
-        run: biome ci --changed --since=main .
+        run: biome ci --changed --since=main --no-errors-on-unmatched .
 
   # Job Test (Khi nào viết test case thì mở ra dùng)
   # test:
