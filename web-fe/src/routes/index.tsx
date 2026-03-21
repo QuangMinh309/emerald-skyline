@@ -4,15 +4,15 @@ import MainLayout from "@components/layout/MainLayout";
 import ProtectedRoute from "@/components/auth/ProtectedRoute";
 import RoleBasedRoute from "@/components/auth/RoleBasedRoute";
 import DetailAssetPage from "@/pages/Assets/detail-asset";
-// import ResidentsPage from "@/pages/Residents/view-residents";
-// import DetailResidentPage from "@/pages/Residents/detail-resident";
-// import BlocksPage from "@/pages/Blocks/view-blocks";
-// import CreateBlockPage from "@/pages/Blocks/create-block";
-// import UpdateBlockPage from "@/pages/Blocks/update-block";
+import ResidentsPage from "@/pages/Residents/view-residents";
+import DetailResidentPage from "@/pages/Residents/detail-resident";
+import BlocksPage from "@/pages/Blocks/view-blocks";
+import CreateBlockPage from "@/pages/Blocks/create-block";
+import UpdateBlockPage from "@/pages/Blocks/update-block";
 // import DetailNotificationPage from "@/pages/Notifications/detail-notification";
-// import DetailBlockPage from "@/pages/Blocks/detail-block";
-// import DetailApartmentPage from "@/pages/Apartments/detail-apartment";
-// import ApartmentsPage from "@/pages/Apartments/view-apartments";
+import DetailBlockPage from "@/pages/Blocks/detail-block";
+import DetailApartmentPage from "@/pages/Apartments/detail-apartment";
+import ApartmentsPage from "@/pages/Apartments/view-apartments";
 // import CreateVotingPage from "@/pages/Votings/create-voting";
 // import UpdateVotingPage from "@/pages/Votings/update-voting";
 // import DetailVotingPage from "@/pages/Votings/detail-voting";
@@ -108,22 +108,22 @@ export const routes = createBrowserRouter([
 			// },
 
 			// // Residents - ADMIN only
-			// {
-			// 	path: "residents",
-			// 	element: (
-			// 		<RoleBasedRoute allowedRoles={["ADMIN"]}>
-			// 			<ResidentsPage />
-			// 		</RoleBasedRoute>
-			// 	),
-			// },
-			// {
-			// 	path: "residents/:id",
-			// 	element: (
-			// 		<RoleBasedRoute allowedRoles={["ADMIN"]}>
-			// 			<DetailResidentPage />
-			// 		</RoleBasedRoute>
-			// 	),
-			// },
+			{
+				path: "residents",
+				element: (
+					<RoleBasedRoute allowedRoles={["ADMIN"]}>
+						<ResidentsPage />
+					</RoleBasedRoute>
+				),
+			},
+			{
+				path: "residents/:id",
+				element: (
+					<RoleBasedRoute allowedRoles={["ADMIN"]}>
+						<DetailResidentPage />
+					</RoleBasedRoute>
+				),
+			},
 
 			// // Services - ADMIN only
 			// {
@@ -154,56 +154,56 @@ export const routes = createBrowserRouter([
 			// },
 
 			// // Blocks - ADMIN only
-			// {
-			// 	path: "blocks",
-			// 	element: (
-			// 		<RoleBasedRoute allowedRoles={["ADMIN"]}>
-			// 			<BlocksPage />
-			// 		</RoleBasedRoute>
-			// 	),
-			// },
-			// {
-			// 	path: "blocks/:id",
-			// 	element: (
-			// 		<RoleBasedRoute allowedRoles={["ADMIN"]}>
-			// 			<DetailBlockPage />
-			// 		</RoleBasedRoute>
-			// 	),
-			// },
-			// {
-			// 	path: "blocks/create",
-			// 	element: (
-			// 		<RoleBasedRoute allowedRoles={["ADMIN"]}>
-			// 			<CreateBlockPage />
-			// 		</RoleBasedRoute>
-			// 	),
-			// },
-			// {
-			// 	path: "blocks/update/:id",
-			// 	element: (
-			// 		<RoleBasedRoute allowedRoles={["ADMIN"]}>
-			// 			<UpdateBlockPage />
-			// 		</RoleBasedRoute>
-			// 	),
-			// },
+			{
+				path: "blocks",
+				element: (
+					<RoleBasedRoute allowedRoles={["ADMIN"]}>
+						<BlocksPage />
+					</RoleBasedRoute>
+				),
+			},
+			{
+				path: "blocks/:id",
+				element: (
+					<RoleBasedRoute allowedRoles={["ADMIN"]}>
+						<DetailBlockPage />
+					</RoleBasedRoute>
+				),
+			},
+			{
+				path: "blocks/create",
+				element: (
+					<RoleBasedRoute allowedRoles={["ADMIN"]}>
+						<CreateBlockPage />
+					</RoleBasedRoute>
+				),
+			},
+			{
+				path: "blocks/update/:id",
+				element: (
+					<RoleBasedRoute allowedRoles={["ADMIN"]}>
+						<UpdateBlockPage />
+					</RoleBasedRoute>
+				),
+			},
 
 			// // Apartments - ADMIN only
-			// {
-			// 	path: "apartments",
-			// 	element: (
-			// 		<RoleBasedRoute allowedRoles={["ADMIN"]}>
-			// 			<ApartmentsPage />
-			// 		</RoleBasedRoute>
-			// 	),
-			// },
-			// {
-			// 	path: "apartments/:id",
-			// 	element: (
-			// 		<RoleBasedRoute allowedRoles={["ADMIN"]}>
-			// 			<DetailApartmentPage />
-			// 		</RoleBasedRoute>
-			// 	),
-			// },
+			{
+				path: "apartments",
+				element: (
+					<RoleBasedRoute allowedRoles={["ADMIN"]}>
+						<ApartmentsPage />
+					</RoleBasedRoute>
+				),
+			},
+			{
+				path: "apartments/:id",
+				element: (
+					<RoleBasedRoute allowedRoles={["ADMIN"]}>
+						<DetailApartmentPage />
+					</RoleBasedRoute>
+				),
+			},
 
 			// // Votings - ADMIN only
 			// {
