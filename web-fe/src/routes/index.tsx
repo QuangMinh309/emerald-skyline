@@ -16,8 +16,8 @@ import ApartmentsPage from "@/pages/Apartments/view-apartments";
 // import CreateVotingPage from "@/pages/Votings/create-voting";
 // import UpdateVotingPage from "@/pages/Votings/update-voting";
 // import DetailVotingPage from "@/pages/Votings/detail-voting";
-// import InvoicesPage from "@/pages/Invoices/view-invoices";
-// import DetailInvoicePage from "@/pages/Invoices/detail-invoice";
+import InvoicesPage from "@/pages/Invoices/view-invoices";
+import DetailInvoicePage from "@/pages/Invoices/detail-invoice";
 // import TechniciansPage from "@/pages/Technicians/view-technicians";
 // import DetailTechnicianPage from "@/pages/Technicians/detail-technician";
 // import MaintenancesPage from "@/pages/Maintenances/view-maintenances";
@@ -240,22 +240,22 @@ export const routes = createBrowserRouter([
 			// },
 
 			// // Invoices - ADMIN only
-			// {
-			// 	path: "invoices",
-			// 	element: (
-			// 		<RoleBasedRoute allowedRoles={["ADMIN"]}>
-			// 			<InvoicesPage />
-			// 		</RoleBasedRoute>
-			// 	),
-			// },
-			// {
-			// 	path: "invoices/:id",
-			// 	element: (
-			// 		<RoleBasedRoute allowedRoles={["ADMIN"]}>
-			// 			<DetailInvoicePage />
-			// 		</RoleBasedRoute>
-			// 	),
-			// },
+			{
+				path: "invoices",
+				element: (
+					<RoleBasedRoute allowedRoles={["ADMIN"]}>
+						<InvoicesPage />
+					</RoleBasedRoute>
+				),
+			},
+			{
+				path: "invoices/:id",
+				element: (
+					<RoleBasedRoute allowedRoles={["ADMIN"]}>
+						<DetailInvoicePage />
+					</RoleBasedRoute>
+				),
+			},
 
 			// // Fees - ADMIN only
 			// {
