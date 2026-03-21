@@ -1,0 +1,35 @@
+import { Module } from "@nestjs/common";
+import { TypeOrmModule } from "@nestjs/typeorm";
+import { Apartment } from "../apartments/entities/apartment.entity";
+import { ApartmentResident } from "../apartments/entities/apartment-resident.entity";
+import { CloudinaryModule } from "../cloudinary/cloudinary.module";
+import { Fee } from "../fees/entities/fee.entity";
+import { FeeTier } from "../fees/entities/fee-tier.entity";
+import { Resident } from "../residents/entities/resident.entity";
+import { SystemNotificationsModule } from "../system-notifications/system-notifications.module";
+import { Invoice } from "./entities/invoice.entity";
+import { InvoiceDetail } from "./entities/invoice-detail.entity";
+import { MeterReading } from "./entities/meter-reading.entity";
+import { InvoicesController } from "./invoices.controller";
+import { InvoicesService } from "./invoices.service";
+
+@Module({
+	imports: [
+		TypeOrmModule.forFeature([
+			Invoice,
+			InvoiceDetail,
+			MeterReading,
+			Fee,
+			FeeTier,
+			Apartment,
+			ApartmentResident,
+			Resident,
+		]),
+		CloudinaryModule,
+		SystemNotificationsModule,
+	],
+	controllers: [InvoicesController],
+	providers: [InvoicesService],
+	exports: [InvoicesService],
+})
+export class InvoicesModule {}
