@@ -10,6 +10,21 @@ on:
     branches: ["main"]
 
 jobs:
+  # Gán nhãn tự động cho PR (dựa trên folder thay đổi)
+  labeler:
+    name: Auto Label PR
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: write
+    # Chỉ chạy khi có Pull Request
+    if: github.event_name == 'pull_request'
+    steps:
+      - uses: actions/labeler@v5
+        with:
+          # GitHub sẽ tự tìm file .github/labeler.yml
+          sync-labels: true
+
   # Phân tích thay đổi
   changes:
     runs-on: ubuntu-latest
@@ -62,18 +77,24 @@ jobs:
       - name: Build AI Docker
         run: cd ai && docker build -t emerald-ai .
 
-  # Triển khai cd (dùng hook của render)
-  deploy:
-    name: Deploy to Render
-    needs: [build-backend, build-ai]
-    if: github.ref == 'refs/heads/main' # Chỉ chạy khi merge vào main
+  # Triển khai Backend (dùng hook của render)
+  deploy-backend:
+    name: Deploy Backend to Render
+    needs: [build-backend]
+    if: github.ref == 'refs/heads/main' && needs.changes.outputs.be == 'true'
     runs-on: ubuntu-latest
     steps:
-      - name: Deploy Backend
-        if: ${{ needs.changes.outputs.be == 'true' }}
+      - name: Trigger Render Backend Hook
         run: curl -X GET ${{ secrets.RENDER_BE_DEPLOY_HOOK }}
-      - name: Deploy AI
-        if: ${{ needs.changes.outputs.ai == 'true' }}
+
+  # Triển khai AI
+  deploy-ai:
+    name: Deploy AI to Render
+    needs: [build-ai]
+    if: github.ref == 'refs/heads/main' && needs.changes.outputs.ai == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Trigger Render AI Hook
         run: curl -X GET ${{ secrets.RENDER_AI_DEPLOY_HOOK }}
 
   # Mobile release (Build APK khi có Tag)
