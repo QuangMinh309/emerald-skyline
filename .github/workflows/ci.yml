@@ -66,6 +66,8 @@ jobs:
     needs: [changes, code-quality] # Check format và lint, đảm bảo có thay đổi trước khi build
     if: ${{ needs.changes.outputs.be == 'true' }}
     runs-on: ubuntu-latest
+    env:
+      DATABASE_URL: ${{ secrets.DATABASE_URL }}
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
