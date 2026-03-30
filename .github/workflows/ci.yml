@@ -1,156 +1,103 @@
-name: Emerald Skyline CI
+name: Emerald Skyline CI/CD
 env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 
 on:
   push:
     branches: ["main"]
+    tags: ["v*"] # Kích hoạt build Mobile khi tạo tag v1.0.0, v1.1...
   pull_request:
     branches: ["main"]
 
 jobs:
-  # Kiểm tra xem folder nào thay đổi
+  # Phân tích thay đổi
   changes:
     runs-on: ubuntu-latest
     outputs:
       be: ${{ steps.filter.outputs.be }}
       web: ${{ steps.filter.outputs.web }}
       mobile: ${{ steps.filter.outputs.mobile }}
+      ai: ${{ steps.filter.outputs.ai }}
     steps:
       - uses: actions/checkout@v4
       - uses: dorny/paths-filter@v3
         id: filter
         with:
           filters: |
-            be:
-              - 'be/**'
-            web:
-              - 'web-fe/**'
-            mobile:
-              - 'mobile-fe/**'
+            be: ['be/**']
+            web: ['web-fe/**']
+            mobile: ['mobile-fe/**']
+            ai: ['ai/**']
 
-  # Tự động gán nhãn phân loại service
-  labeler:
-    name: Auto Label PR
-    permissions:
-      contents: read
-      pull-requests: write
-    runs-on: ubuntu-latest
-    if: github.event_name == 'pull_request'
-    steps:
-      - uses: actions/labeler@v5
-
+  # Kiểm tra chất lượng toàn repo
   code-quality:
-    name: Check Code Quality (Biome)
+    name: Check Quality (Biome)
     runs-on: ubuntu-latest
-    permissions:
-      contents: read
-
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
         with:
-          fetch-depth: 0 # Bắt buộc phải có để Biome tính toán được file nào vừa bị change
+          fetch-depth: 0
+      - uses: biomejs/setup-biome@v2
+      - run: biome ci --changed --since=main --no-errors-on-unmatched .
 
-      - name: Setup Biome
-        uses: biomejs/setup-biome@v2
-        with:
-          version: latest
-
-      - name: Run Biome check (CI mode)
-        # Thêm --since=main để tường minh
-        run: biome ci --changed --since=main --no-errors-on-unmatched .
-
+  # Build backend nếu folder be thay đổi
   build-backend:
-    name: Build NestJS Backend
-    needs: [changes, code-quality] # Check format và lint, đảm bảo có thay đổi trước khi build
+    needs: [changes, code-quality]
     if: ${{ needs.changes.outputs.be == 'true' }}
     runs-on: ubuntu-latest
     env:
       DATABASE_URL: ${{ secrets.DATABASE_URL }}
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
+      - name: Build Docker Check
+        run: cd be && docker build -t emerald-be .
 
-      - name: Setup Node.js (Version 22)
-        uses: actions/setup-node@v4
-        with:
-          node-version: "22"
-          cache: "npm"
-          cache-dependency-path: be/package-lock.json
-
-      - name: Install Backend Deps
-        run: cd be && npm ci
-
-      - name: Build Backend
-        run: cd be && npm run build
-
-      - name: Size Monitor
-        run: |
-          echo "### Backend Build Size" >> $GITHUB_STEP_SUMMARY
-          du -sh be/dist >> $GITHUB_STEP_SUMMARY
-
-  build-frontend:
-    name: Build React Web
+  # Build AI service nếu folder ai thay đổi
+  build-ai:
     needs: [changes, code-quality]
-    if: ${{ needs.changes.outputs.web == 'true' }}
+    if: ${{ needs.changes.outputs.ai == 'true' }}
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
+      - name: Build AI Docker
+        run: cd ai && docker build -t emerald-ai .
 
-      - name: Setup Node.js (Version 22)
-        uses: actions/setup-node@v4
-        with:
-          node-version: "22"
-          cache: "npm"
-          cache-dependency-path: web-fe/package-lock.json
-
-      - name: Install Frontend Deps
-        run: cd web-fe && npm ci
-
-      - name: Build Frontend
-        run: cd web-fe && npm run build
-
-      - name: Size Monitor
-        run: |
-          echo "### Web Build Size" >> $GITHUB_STEP_SUMMARY
-          (du -sh web-fe/dist || du -sh web-fe/build) >> $GITHUB_STEP_SUMMARY
-
-  # Type-Check Mobile (React Native)
-  check-mobile:
-    name: Type Check Mobile
-    needs: [changes, code-quality]
-    if: ${{ needs.changes.outputs.mobile == 'true' }}
+  # Triển khai cd (dùng hook của render)
+  deploy:
+    name: Deploy to Render
+    needs: [build-backend, build-ai]
+    if: github.ref == 'refs/heads/main' # Chỉ chạy khi merge vào main
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
+      - name: Deploy Backend
+        if: ${{ needs.changes.outputs.be == 'true' }}
+        run: curl -X GET ${{ secrets.RENDER_BE_DEPLOY_HOOK }}
+      - name: Deploy AI
+        if: ${{ needs.changes.outputs.ai == 'true' }}
+        run: curl -X GET ${{ secrets.RENDER_AI_DEPLOY_HOOK }}
 
-      - name: Setup Node.js (Version 22)
-        uses: actions/setup-node@v4
+  # Mobile release (Build APK khi có Tag)
+  release-mobile:
+    name: Build & Release APK
+    needs: [changes]
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
         with:
-          node-version: "22"
-          cache: "npm"
-          cache-dependency-path: mobile-fe/package-lock.json
-
-      - name: Install Deps
-        run: cd mobile-fe && npm ci
-
-      - name: Type Check
-        # Lệnh này kiểm tra lỗi TypeScript mà không cần build APK
-        run: cd mobile-fe && npx tsc --noEmit
-
-  # Job Test (Khi nào viết test case thì mở ra dùng)
-  # test:
-  #   name: Run Tests
-  #   needs: code-quality
-  #   runs-on: ubuntu-latest
-  #   steps:
-  #     - uses: actions/checkout@v4
-  #     - uses: actions/setup-node@v4
-  #       with:
-  #         node-version: '22'
-  #         cache: 'npm'
-  #     - name: Test backend
-  #       run: cd be && npm ci && npm run test
+          java-version: "17"
+          distribution: "temurin"
+      - name: Build APK
+        run: |
+          cd mobile-fe
+          npm ci
+          cd android && ./gradlew assembleDebug
+      - name: Create Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: mobile-fe/android/app/build/outputs/apk/debug/app-debug.apk
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
