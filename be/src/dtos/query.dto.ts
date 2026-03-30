@@ -1,0 +1,22 @@
+import { Type } from "class-transformer";
+import {
+	ArrayNotEmpty,
+	IsIn,
+	IsNumber,
+	IsNumberString,
+	IsOptional,
+	IsString,
+} from "class-validator";
+import { NumberOptional, StringOptional } from "src/decorators/dto.decorator";
+
+export class QueryDto {
+	@StringOptional()
+	search?: string;
+
+	@StringOptional()
+	sortBy?: string;
+
+	@IsOptional()
+	@IsIn(["ASC", "DESC"])
+	sortOrder?: "ASC" | "DESC";
+}
