@@ -56,47 +56,62 @@ jobs:
 
   # 4. Build (chỉ build những phần có thay đổi)
   build-backend:
-    name: Build Backend (Docker)
+    name: Build Backend (Docker Cache)
     needs: [changes, code-quality]
     if: needs.changes.outputs.be == 'true'
     runs-on: ubuntu-latest
-    env:
-      DATABASE_URL: ${{ secrets.DATABASE_URL }}
     steps:
       - uses: actions/checkout@v4
 
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      # Build Image với cơ chế lưu Cache lên GitHub Actions (GHA)
       - name: Build Docker Image
-        run: docker build -t emerald-be ./be
+        uses: docker/build-push-action@v6
+        with:
+          context: ./be
+          load: true
+          tags: emerald-be:latest
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
 
       - name: Size Monitor
         run: |
-          echo "### Backend Docker Image Size" >> $GITHUB_STEP_SUMMARY
-          docker image inspect emerald-be \
-            --format '| emerald-be | {{.Size}} bytes |' >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          # Hiển thị dạng human-readable
-          docker image ls emerald-be \
-            --format '| {{.Repository}} | {{.Tag}} | {{.Size}} |' >> $GITHUB_STEP_SUMMARY
+          echo "### Backend Artifact Report" >> $GITHUB_STEP_SUMMARY
+          echo "| Repository | Tag | Size |" >> $GITHUB_STEP_SUMMARY
+          echo "| :--- | :--- | :--- |" >> $GITHUB_STEP_SUMMARY
+          docker image ls emerald-be --format "| {{.Repository}} | {{.Tag}} | {{.Size}} |" >> $GITHUB_STEP_SUMMARY
+
+          echo -e "\n**Raw Data (Bytes):**" >> $GITHUB_STEP_SUMMARY
+          docker image inspect emerald-be --format '`emerald-be: {{.Size}} bytes`' >> $GITHUB_STEP_SUMMARY
 
   build-ai:
-    name: Build AI Service (Docker)
+    name: Build AI Service (Docker Cache)
     needs: [changes, code-quality]
     if: needs.changes.outputs.ai == 'true'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
 
-      - name: Build Docker Image
-        run: docker build -t emerald-ai ./ai
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build AI Image
+        uses: docker/build-push-action@v6
+        with:
+          context: ./ai
+          load: true
+          tags: emerald-ai:latest
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
 
       - name: Size Monitor
         run: |
-          echo "### AI Service Docker Image Size" >> $GITHUB_STEP_SUMMARY
-          docker image inspect emerald-ai \
-            --format '| emerald-ai | {{.Size}} bytes |' >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          docker image ls emerald-ai \
-            --format '| {{.Repository}} | {{.Tag}} | {{.Size}} |' >> $GITHUB_STEP_SUMMARY
+          echo "### AI Service Artifact Report" >> $GITHUB_STEP_SUMMARY
+          echo "| Repository | Tag | Size |" >> $GITHUB_STEP_SUMMARY
+          echo "| :--- | :--- | :--- |" >> $GITHUB_STEP_SUMMARY
+          docker image ls emerald-ai --format "| {{.Repository}} | {{.Tag}} | {{.Size}} |" >> $GITHUB_STEP_SUMMARY
 
   build-frontend:
     name: Build React Web
@@ -113,17 +128,25 @@ jobs:
           cache: "npm"
           cache-dependency-path: web-fe/package-lock.json
 
-      - name: Install & Build
-        run: |
-          cd web-fe
-          npm ci
-          npm run build
+      - name: Deterministic Dependency Installation
+        run: cd web-fe && npm ci
 
-      - name: Size Monitor
+      - name: Production Build
+        run: cd web-fe && npm run build
+
+      - name: Static Assets Analysis
         run: |
-          echo "### Web Build Size" >> $GITHUB_STEP_SUMMARY
-          # Hỗ trợ cả Vite (dist/) lẫn CRA (build/)
-          (du -sh web-fe/dist 2>/dev/null || du -sh web-fe/build) >> $GITHUB_STEP_SUMMARY
+          echo "### Frontend Build Analytics" >> $GITHUB_STEP_SUMMARY
+          echo "**Deployment Directory:** \`web-fe/dist\`" >> $GITHUB_STEP_SUMMARY
+          echo -e "\n**Total Bundle Size:**" >> $GITHUB_STEP_SUMMARY
+          echo '```text' >> $GITHUB_STEP_SUMMARY
+          du -sh web-fe/dist 2>/dev/null || du -sh web-fe/build >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
+
+          echo -e "\n**Top 5 Largest Files:**" >> $GITHUB_STEP_SUMMARY
+          echo "| File Path | Size |" >> $GITHUB_STEP_SUMMARY
+          echo "| :--- | :--- |" >> $GITHUB_STEP_SUMMARY
+          find web-fe/dist -type f -exec du -h {} + | sort -rh | head -n 5 | awk '{print "| " $2 " | " $1 " |"}' >> $GITHUB_STEP_SUMMARY
 
   # Deploy (chỉ khi push lên main)
   deploy-backend:
