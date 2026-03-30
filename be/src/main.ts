@@ -1,8 +1,50 @@
+import { Logger, ValidationPipe } from "@nestjs/common";
 import { NestFactory } from "@nestjs/core";
+import { DocumentBuilder, SwaggerModule } from "@nestjs/swagger";
+import cookieParser from "cookie-parser";
 import { AppModule } from "./app.module";
 
 async function bootstrap() {
 	const app = await NestFactory.create(AppModule);
-	await app.listen(process.env.PORT ?? 3000);
+
+	// Enable cookie parser middleware (MUST be before passport)
+	// This allows RefreshTokenStrategy to read cookies via req.cookies
+	app.use(cookieParser());
+
+	// Global validation pipe
+	app.useGlobalPipes(
+		new ValidationPipe({
+			whitelist: true,
+			forbidNonWhitelisted: true,
+			transform: true,
+			transformOptions: {
+				enableImplicitConversion: false, // Disable implicit conversion
+			},
+		}),
+	);
+
+	// CORS
+	app.enableCors({
+		origin: [process.env.FRONTEND_URL, "http://localhost:3000"],
+		credentials: true,
+	});
+
+	app.setGlobalPrefix("api/v1");
+
+	// Swagger
+	const config = new DocumentBuilder()
+		.setTitle("Emerald Tower API")
+		.setDescription("API documentation for the apartment management system")
+		.setVersion("1.0")
+		.addBearerAuth()
+		.build();
+	const documentFactory = () => SwaggerModule.createDocument(app, config);
+	SwaggerModule.setup("api/v1/docs", app, documentFactory);
+
+	const logger = new Logger("Bootstrap");
+	const port = process.env.PORT ?? 4000;
+	await app.listen(port);
+	logger.log(`🚀 Server is running on port ${port}`);
+	logger.log(`📚 Swagger is available at http://localhost:${port}/api/v1/docs`);
 }
 bootstrap();
