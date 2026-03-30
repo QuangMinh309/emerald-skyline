@@ -5,8 +5,8 @@ FROM node:22-alpine AS builder
 WORKDIR /app
 # Copy file định nghĩa thư viện trước để tận dụng cache của Docker
 COPY package*.json ./
-# Cài đặt toàn bộ thư viện (bao gồm cả devDependencies để build)
-RUN npm ci
+RUN --mount=type=cache,target=/root/.npm \
+    npm ci
 COPY . .
 RUN npm run build
 
