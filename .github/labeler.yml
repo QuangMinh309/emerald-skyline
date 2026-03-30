@@ -1,13 +1,24 @@
 # Cấu hình luật gán nhãn
 backend:
-  - be/**/*
+  - changed-files:
+      - any-glob-to-any-file: "be/**/*"
+
 web:
-  - web-fe/**/*
+  - changed-files:
+      - any-glob-to-any-file: "web-fe/**/*"
+
 mobile:
-  - mobile-fe/**/*
+  - changed-files:
+      - any-glob-to-any-file: "mobile-fe/**/*"
+
 ai:
-  - ai/**/*
+  - changed-files:
+      - any-glob-to-any-file: "ai/**/*"
+
 documentation:
-  - "**/README.md"
+  - changed-files:
+      - any-glob-to-any-file: "**/README.md"
+
 ci-cd:
-  - .github/workflows/**/*
+  - changed-files:
+      - any-glob-to-any-file: ".github/workflows/**/*"
