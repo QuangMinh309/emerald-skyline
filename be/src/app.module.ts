@@ -6,6 +6,7 @@ import { AppController } from "./app.controller";
 import { AppService } from "./app.service";
 import getDatabaseConfig from "./configs/database.config";
 import { AccountsModule } from "./modules/accounts/accounts.module";
+import { AiModule } from "./modules/ai/ai.module";
 import { ApartmentsModule } from "./modules/apartments/apartments.module";
 import { AuthModule } from "./modules/auth/auth.module";
 import { BlocksModule } from "./modules/blocks/blocks.module";
@@ -23,7 +24,6 @@ import { SupabaseStorageModule } from "./modules/supabase-storage/supabase-stora
 	imports: [
 		ConfigModule.forRoot({
 			isGlobal: true,
-			envFilePath: ".env",
 		}),
 		TypeOrmModule.forRootAsync({
 			inject: [ConfigService],
@@ -43,6 +43,7 @@ import { SupabaseStorageModule } from "./modules/supabase-storage/supabase-stora
 		InvoicesModule,
 		PaymentsModule,
 		FeesModule,
+		AiModule,
 	],
 	controllers: [AppController],
 	providers: [AppService],
