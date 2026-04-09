@@ -1,7 +1,7 @@
 import { MigrationInterface, QueryRunner } from "typeorm";
 
-export class $npmConfigName1774860670608 implements MigrationInterface {
-	name = " $npmConfigName1774860670608";
+export class CreateAccountTable1775726191026 implements MigrationInterface {
+	name = "CreateAccountTable1775726191026";
 
 	public async up(queryRunner: QueryRunner): Promise<void> {
 		await queryRunner.query(
