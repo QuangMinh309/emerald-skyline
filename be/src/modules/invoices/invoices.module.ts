@@ -6,7 +6,7 @@ import { CloudinaryModule } from "../cloudinary/cloudinary.module";
 import { Fee } from "../fees/entities/fee.entity";
 import { FeeTier } from "../fees/entities/fee-tier.entity";
 import { Resident } from "../residents/entities/resident.entity";
-import { SystemNotificationsModule } from "../system-notifications/system-notifications.module";
+// import { SystemNotificationsModule } from "../system-notifications/system-notifications.module";
 import { Invoice } from "./entities/invoice.entity";
 import { InvoiceDetail } from "./entities/invoice-detail.entity";
 import { MeterReading } from "./entities/meter-reading.entity";
@@ -26,7 +26,7 @@ import { InvoicesService } from "./invoices.service";
 			Resident,
 		]),
 		CloudinaryModule,
-		SystemNotificationsModule,
+		// SystemNotificationsModule,
 	],
 	controllers: [InvoicesController],
 	providers: [InvoicesService],

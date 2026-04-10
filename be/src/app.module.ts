@@ -1,5 +1,6 @@
 import { Module } from "@nestjs/common";
 import { ConfigModule, ConfigService } from "@nestjs/config";
+import { ScheduleModule } from "@nestjs/schedule";
 import { TypeOrmModule } from "@nestjs/typeorm";
 import { AppController } from "./app.controller";
 import { AppService } from "./app.service";
@@ -8,9 +9,14 @@ import { AccountsModule } from "./modules/accounts/accounts.module";
 import { ApartmentsModule } from "./modules/apartments/apartments.module";
 import { AuthModule } from "./modules/auth/auth.module";
 import { BlocksModule } from "./modules/blocks/blocks.module";
+import { BookingsModule } from "./modules/bookings/bookings.module";
 import { CloudinaryModule } from "./modules/cloudinary/cloudinary.module";
+import { FeesModule } from "./modules/fees/fees.module";
+import { InvoicesModule } from "./modules/invoices/invoices.module";
 import { MailerModule } from "./modules/mailer/mailer.module";
+import { PaymentsModule } from "./modules/payments/payments.module";
 import { ResidentsModule } from "./modules/residents/residents.module";
+import { ServicesModule } from "./modules/services/services.module";
 import { SupabaseStorageModule } from "./modules/supabase-storage/supabase-storage.module";
 
 @Module({
@@ -23,6 +29,7 @@ import { SupabaseStorageModule } from "./modules/supabase-storage/supabase-stora
 			inject: [ConfigService],
 			useFactory: getDatabaseConfig,
 		}),
+		ScheduleModule.forRoot(),
 		AuthModule,
 		AccountsModule,
 		MailerModule,
@@ -31,6 +38,11 @@ import { SupabaseStorageModule } from "./modules/supabase-storage/supabase-stora
 		ResidentsModule,
 		BlocksModule,
 		ApartmentsModule,
+		ServicesModule,
+		BookingsModule,
+		InvoicesModule,
+		PaymentsModule,
+		FeesModule,
 	],
 	controllers: [AppController],
 	providers: [AppService],
