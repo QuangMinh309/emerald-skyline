@@ -1,0 +1,553 @@
+import {
+	BadRequestException,
+	ConflictException,
+	HttpException,
+	HttpStatus,
+	Injectable,
+	NotFoundException,
+} from "@nestjs/common";
+import { InjectRepository } from "@nestjs/typeorm";
+import { FindOptionsWhere, ILike, In, Repository } from "typeorm";
+import { Account } from "../accounts/entities/account.entity";
+import { UserRole } from "../accounts/enums/user-role.enum";
+import { Apartment } from "../apartments/entities/apartment.entity";
+import { ApartmentResident } from "../apartments/entities/apartment-resident.entity";
+import { ApartmentStatus } from "../apartments/enums/apartment-status.enum";
+import { Booking } from "../bookings/entities/booking.entity";
+import { CloudinaryService } from "../cloudinary/cloudinary.service";
+import { Invoice } from "../invoices/entities/invoice.entity";
+import { PaymentTransaction } from "../payments/entities/payment-transaction.entity";
+import { CreateResidentDto } from "./dto/create-resident.dto";
+import { QueryResidentDto } from "./dto/query-resident.dto";
+import { UpdateResidentDto } from "./dto/update-resident.dto";
+import { Resident } from "./entities/resident.entity";
+
+@Injectable()
+export class ResidentsService {
+	constructor(
+		@InjectRepository(Resident)
+		private readonly residentRepository: Repository<Resident>,
+		@InjectRepository(Account)
+		private readonly accountRepository: Repository<Account>,
+		@InjectRepository(Invoice)
+		private readonly invoiceRepository: Repository<Invoice>,
+		@InjectRepository(Booking)
+		private readonly bookingRepository: Repository<Booking>,
+		@InjectRepository(PaymentTransaction)
+		private readonly paymentTransactionRepository: Repository<PaymentTransaction>,
+		@InjectRepository(ApartmentResident)
+		private readonly apartmentResidentRepository: Repository<ApartmentResident>,
+		@InjectRepository(Apartment)
+		private readonly apartmentRepository: Repository<Apartment>,
+		private readonly cloudinaryService: CloudinaryService,
+	) {}
+
+	/**
+	 * Convert CCCD to password (remove Vietnamese accents and spaces)
+	 */
+	private generatePasswordFromCCCD(citizenId: string): string {
+		// Just use the citizen ID as password
+		return citizenId;
+	}
+
+	async create(
+		createResidentDto: CreateResidentDto,
+		imageFile?: Express.Multer.File,
+	) {
+		// Check if citizen ID already exists
+		const existingCitizen = await this.residentRepository.findOne({
+			where: { citizenId: createResidentDto.citizenId },
+		});
+
+		if (existingCitizen)
+			throw new HttpException("Citizen ID đã tồn tại", HttpStatus.CONFLICT);
+
+		// Check if email already exists
+		const existingEmail = await this.accountRepository.findOne({
+			where: { email: createResidentDto.email },
+		});
+
+		if (existingEmail) {
+			throw new HttpException("Email đã tồn tại", HttpStatus.CONFLICT);
+		}
+
+		// Generate password from CCCD
+		const password = this.generatePasswordFromCCCD(createResidentDto.citizenId);
+
+		// Upload image if provided
+		let imageUrl: string | undefined = undefined;
+		if (imageFile) {
+			try {
+				const uploadResult = await this.cloudinaryService.uploadFile(imageFile);
+				if (uploadResult) {
+					imageUrl = uploadResult.secure_url;
+				}
+			} catch (error) {
+				throw new HttpException(
+					"Upload ảnh không thành công",
+					HttpStatus.BAD_REQUEST,
+				);
+			}
+		}
+
+		// Create account first
+		const account = this.accountRepository.create({
+			email: createResidentDto.email,
+			password,
+			role: UserRole.RESIDENT,
+			isActive: true,
+		});
+
+		const savedAccount = await this.accountRepository.save(account);
+
+		// Create resident
+		const resident = this.residentRepository.create({
+			fullName: createResidentDto.fullName,
+			citizenId: createResidentDto.citizenId,
+			dob: new Date(createResidentDto.dob),
+			gender: createResidentDto.gender,
+			phoneNumber: createResidentDto.phoneNumber,
+			nationality: createResidentDto.nationality,
+			province: createResidentDto.province,
+			district: createResidentDto.district,
+			ward: createResidentDto.ward,
+			detailAddress: createResidentDto.detailAddress,
+			accountId: savedAccount.id,
+			imageUrl,
+		});
+
+		const savedResident = await this.residentRepository.save(resident);
+
+		// Return with account information
+		return this.findOne(savedResident.id);
+	}
+
+	async findAll(query: QueryResidentDto) {
+		const { search, gender, nationality } = query;
+
+		// Build query with search
+		const queryBuilder = this.residentRepository
+			.createQueryBuilder("resident")
+			.leftJoinAndSelect("resident.account", "account")
+			.leftJoinAndSelect("resident.apartmentResidents", "apartmentResidents")
+			.leftJoinAndSelect("apartmentResidents.apartment", "apartment")
+			.leftJoinAndSelect("apartment.block", "block")
+			.where("resident.isActive = :isActive", { isActive: true });
+
+		if (gender) {
+			queryBuilder.andWhere("resident.gender = :gender", { gender });
+		}
+
+		if (nationality) {
+			queryBuilder.andWhere("resident.nationality = :nationality", {
+				nationality,
+			});
+		}
+
+		if (search) {
+			queryBuilder.andWhere(
+				"(resident.fullName ILIKE :search OR resident.citizenId ILIKE :search)",
+				{ search: `%${search}%` },
+			);
+		}
+
+		queryBuilder.orderBy("resident.createdAt", "DESC");
+
+		const residents = await queryBuilder.getMany();
+
+		// Transform to include residences
+		return residents.map((resident) => ({
+			...resident,
+			residences: resident.apartmentResidents?.map((ar) => ({
+				id: ar.id,
+				apartmentId: ar.apartmentId,
+				apartment: {
+					id: ar.apartment.id,
+					roomNumber: ar.apartment.name,
+					blockName: ar.apartment.block.name,
+					area: ar.apartment.area,
+				},
+				relationship: ar.relationship,
+			})),
+		}));
+	}
+
+	async findOne(id: number) {
+		const resident = await this.residentRepository.findOne({
+			where: { id, isActive: true },
+			relations: [
+				"account",
+				"apartmentResidents",
+				"apartmentResidents.apartment",
+				"apartmentResidents.apartment.block",
+			],
+		});
+
+		if (!resident) {
+			throw new HttpException(
+				`Resident với ID ${id} không tồn tại`,
+				HttpStatus.NOT_FOUND,
+			);
+		}
+
+		return {
+			...resident,
+			residences: resident.apartmentResidents?.map((ar) => ({
+				id: ar.id,
+				apartmentId: ar.apartmentId,
+				apartment: {
+					id: ar.apartment.id,
+					roomNumber: ar.apartment.name,
+					blockName: ar.apartment.block.name,
+					area: ar.apartment.area,
+				},
+				relationship: ar.relationship,
+			})),
+		};
+	}
+
+	async findByCitizenId(citizenId: string) {
+		return this.residentRepository.findOne({
+			where: { citizenId, isActive: true },
+			relations: ["account"],
+		});
+	}
+
+	async update(
+		id: number,
+		updateResidentDto: UpdateResidentDto,
+		imageFile?: Express.Multer.File,
+	) {
+		const resident = await this.findOne(id);
+
+		// Check if citizen ID is being changed and if it already exists
+		if (
+			updateResidentDto.citizenId &&
+			updateResidentDto.citizenId !== resident.citizenId
+		) {
+			const existingCitizen = await this.findByCitizenId(
+				updateResidentDto.citizenId,
+			);
+			if (existingCitizen) {
+				throw new HttpException("Citizen ID đã tồn tại", HttpStatus.CONFLICT);
+			}
+		}
+
+		// Upload new image if provided
+		if (imageFile) {
+			try {
+				// Delete old image if exists
+				if (resident.imageUrl) {
+					const publicId = resident.imageUrl.split("/").pop()?.split(".")[0];
+					if (publicId) {
+						await this.cloudinaryService.deleteFile(publicId);
+					}
+				}
+
+				// Upload new image
+				const uploadResult = await this.cloudinaryService.uploadFile(imageFile);
+				if (uploadResult) {
+					updateResidentDto.image = uploadResult.secure_url;
+				}
+			} catch (error) {
+				throw new HttpException("Failed to upload ảnh", HttpStatus.BAD_REQUEST);
+			}
+		}
+
+		// Update resident
+		Object.assign(resident, {
+			...updateResidentDto,
+			...(updateResidentDto.dob && { dob: new Date(updateResidentDto.dob) }),
+			...(updateResidentDto.image && { imageUrl: updateResidentDto.image }),
+		});
+
+		await this.residentRepository.save(resident);
+
+		return this.findOne(id);
+	}
+
+	async remove(id: number) {
+		const resident = await this.findOne(id);
+
+		const apartmentResidents = await this.apartmentResidentRepository.find({
+			where: { residentId: id },
+		});
+
+		if (apartmentResidents.length > 0) {
+			throw new HttpException(
+				"Không thể xóa cư dân đang là chủ hộ hoặc thành viên. Vui lòng thay đổi chủ hộ/thành viên trước khi xóa.",
+				HttpStatus.BAD_REQUEST,
+			);
+		}
+
+		// Soft delete resident
+		resident.isActive = false;
+		await this.residentRepository.save(resident);
+
+		// Soft delete associated account
+		const account = await this.accountRepository.findOne({
+			where: { id: resident.accountId },
+		});
+
+		if (account) {
+			account.isActive = false;
+			await this.accountRepository.save(account);
+		}
+
+		return resident;
+	}
+
+	async removeMany(ids: number[]) {
+		const residents = await this.residentRepository.find({
+			where: { id: In(ids), isActive: true },
+			relations: ["account"],
+		});
+
+		if (residents.length === 0) {
+			throw new HttpException(
+				"Không tìm thấy cư dân với các ID đã cung cấp",
+				HttpStatus.NOT_FOUND,
+			);
+		}
+
+		// Check if any resident is living in an apartment
+		const apartmentResidents = await this.apartmentResidentRepository.find({
+			where: { residentId: In(ids) },
+		});
+
+		if (apartmentResidents.length > 0) {
+			throw new HttpException(
+				"Không thể xóa cư dân đang là chủ hộ hoặc thành viên. Vui lòng thay đổi chủ hộ/thành viên trước khi xóa.",
+				HttpStatus.BAD_REQUEST,
+			);
+		}
+
+		// Get affected apartment IDs before deletion
+		const affectedApartmentIds = [
+			...new Set(apartmentResidents.map((ar) => ar.apartmentId)),
+		];
+
+		// Soft delete all residents
+		await this.residentRepository.update({ id: In(ids) }, { isActive: false });
+
+		// Check if any apartments became empty and log warning
+		if (affectedApartmentIds.length > 0) {
+			for (const apartmentId of affectedApartmentIds) {
+				const remainingResidents = await this.apartmentResidentRepository.count(
+					{
+						where: { apartmentId },
+					},
+				);
+
+				if (remainingResidents === 0) {
+					// Optional: Auto-update apartment status to VACANT
+					await this.apartmentRepository.update(
+						{ id: apartmentId },
+						{ status: ApartmentStatus.VACANT },
+					);
+				}
+			}
+		}
+
+		// Soft delete associated accounts
+		const accountIds = residents
+			.map((r) => r.accountId)
+			.filter((id) => id !== null && id !== undefined);
+		if (accountIds.length > 0) {
+			await this.accountRepository.update(
+				{ id: In(accountIds) },
+				{ isActive: false },
+			);
+		}
+
+		return {
+			message: `Đã xóa thành công ${residents.length} cư dân`,
+			deletedCount: residents.length,
+		};
+	}
+
+	async getMyProfile(accountId: number) {
+		// Find resident by account ID
+		const resident = await this.residentRepository.findOne({
+			where: { accountId, isActive: true },
+			relations: ["account"],
+		});
+
+		if (!resident) {
+			throw new HttpException("Cư dân không tồn tại", HttpStatus.NOT_FOUND);
+		}
+
+		// Get all apartment-resident records for this resident
+		const apartmentResidents = await this.apartmentResidentRepository.find({
+			where: { residentId: resident.id },
+		});
+
+		// Get detailed apartment information with block data
+		const apartments = await Promise.all(
+			apartmentResidents.map(async (ar) => {
+				const apartment = await this.apartmentRepository.findOne({
+					where: { id: ar.apartmentId },
+					relations: ["block"],
+				});
+
+				if (!apartment) {
+					return null;
+				}
+
+				return {
+					apartment,
+					relationship: ar.relationship,
+				};
+			}),
+		);
+
+		// Filter out null apartments (deleted ones)
+		const validApartments = apartments.filter((apt) => apt !== null);
+
+		// Get bookings for this resident
+		const bookings = await this.bookingRepository.find({
+			where: { residentId: resident.id },
+			order: { createdAt: "DESC" },
+		});
+
+		// Get payment transactions for this resident (by accountId)
+		const payments = await this.paymentTransactionRepository.find({
+			where: { accountId },
+			order: { createdAt: "DESC" },
+		});
+
+		// Return resident with related data (without invoices)
+		return {
+			...resident,
+			apartments: validApartments,
+			bookings,
+			payments,
+		};
+	}
+
+	/**
+	 * Get invoices and payment transactions for current resident's apartments
+	 */
+	async getMyInvoices(accountId: number) {
+		// Find resident by account ID
+		const resident = await this.residentRepository.findOne({
+			where: { accountId, isActive: true },
+		});
+
+		if (!resident) {
+			throw new HttpException("Cư dân không tồn tại", HttpStatus.NOT_FOUND);
+		}
+
+		// Get all apartment-resident records for this resident
+		const apartmentResidents = await this.apartmentResidentRepository.find({
+			where: { residentId: resident.id },
+		});
+
+		const apartmentIds = apartmentResidents.map((ar) => ar.apartmentId);
+
+		// Get invoices for all apartments
+		const invoices =
+			apartmentIds.length > 0
+				? await this.invoiceRepository.find({
+						where: { apartmentId: In(apartmentIds) },
+						relations: ["apartment"],
+						order: { createdAt: "DESC" },
+					})
+				: [];
+
+		// Get payment transactions for this resident (by accountId)
+		const payments = await this.paymentTransactionRepository.find({
+			where: { accountId },
+			order: { createdAt: "DESC" },
+		});
+
+		// Return invoices and payments together
+		return {
+			invoices,
+			payments,
+		};
+	}
+
+	/**
+	 * Get invoices and payment transactions for a specific resident by ID
+	 */
+	async getResidentInvoices(residentId: number) {
+		// Find resident by ID
+		const resident = await this.residentRepository.findOne({
+			where: { id: residentId, isActive: true },
+		});
+
+		if (!resident) {
+			throw new HttpException("Cư dân không tồn tại", HttpStatus.NOT_FOUND);
+		}
+
+		// Get all apartment-resident records for this resident
+		const apartmentResidents = await this.apartmentResidentRepository.find({
+			where: { residentId: resident.id },
+		});
+
+		const apartmentIds = apartmentResidents.map((ar) => ar.apartmentId);
+
+		// Get invoices for all apartments
+		const invoices =
+			apartmentIds.length > 0
+				? await this.invoiceRepository.find({
+						where: { apartmentId: In(apartmentIds) },
+						relations: ["apartment"],
+						order: { createdAt: "DESC" },
+					})
+				: [];
+
+		// Get payment transactions for this resident (by accountId)
+		const payments = resident.accountId
+			? await this.paymentTransactionRepository.find({
+					where: { accountId: resident.accountId },
+					order: { createdAt: "DESC" },
+				})
+			: [];
+
+		// Return invoices and payments together
+		return {
+			invoices,
+			payments,
+		};
+	}
+
+	/**
+	 * Get residences (apartment-resident relationships) for a specific resident
+	 */
+	async getResidentResidences(residentId: number) {
+		// Find resident by ID
+		const resident = await this.residentRepository.findOne({
+			where: { id: residentId, isActive: true },
+		});
+
+		if (!resident) {
+			throw new HttpException("Cư dân không tồn tại", HttpStatus.NOT_FOUND);
+		}
+
+		// Get all apartment-resident records with apartment and block details
+		const residences = await this.apartmentResidentRepository.find({
+			where: { residentId: resident.id },
+			relations: ["apartment", "apartment.block"],
+			order: { id: "ASC" },
+		});
+
+		// Transform to include block name in apartment
+		const transformedResidences = residences.map((residence) => ({
+			id: residence.id,
+			apartmentId: residence.apartmentId,
+			apartment: {
+				id: residence.apartment.id,
+				roomNumber: residence.apartment.name,
+				blockName: residence.apartment.block?.name || "N/A",
+				area: residence.apartment.area,
+			},
+			relationship: residence.relationship,
+		}));
+
+		return {
+			residences: transformedResidences,
+		};
+	}
+}
