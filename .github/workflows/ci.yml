@@ -185,15 +185,6 @@ jobs:
       - name: Trigger Render Deploy Hook
         run: curl -fsSL -X GET ${{ secrets.RENDER_BE_DEPLOY_HOOK }}
 
-  deploy-ai:
-    name: Deploy AI to Render
-    needs: [changes, build-ai]
-    if: github.ref == 'refs/heads/main' && needs.changes.outputs.ai == 'true'
-    runs-on: ubuntu-latest
-    steps:
-      - name: Trigger Render Deploy Hook
-        run: curl -fsSL -X GET ${{ secrets.RENDER_AI_DEPLOY_HOOK }}
-
   deploy-frontend:
     name: Deploy Frontend to Vercel
     needs: [changes, build-frontend]
