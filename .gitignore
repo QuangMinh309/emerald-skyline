@@ -48,6 +48,14 @@ expo-env.d.ts
 # *.pt
 # *.pth
 
+# PaddleOCR Models
+.paddleocr/
+
+# YOLO Models (uncomment if you don't want to push heavy models)
+# ai/best.pt
+# ai/runs/
+# ai/ultralytics/
+
 # =========================================
 # LOGS & TESTS
 # =========================================
@@ -60,6 +68,11 @@ pnpm-debug.log*
 lerna-debug.log*
 coverage/
 .nyc_output/
+
+# Python test & coverage
+.pytest_cache/
+.coverage
+htmlcov/
 
 # =========================================
 # OS & IDEs (VS Code, IntelliJ, etc.)

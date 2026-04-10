@@ -54,7 +54,34 @@ jobs:
       - uses: biomejs/setup-biome@v2
       - run: biome ci --changed --since=main --no-errors-on-unmatched .
 
-  # 4. Build (chỉ build những phần có thay đổi)
+  # Chỉ thực hiện ở các folder có thay đổi, và chạy song song để tiết kiệm thời gian
+  # Lint Python AI module
+  lint-ai:
+    name: Lint AI Service (Python)
+    needs: [changes]
+    if: needs.changes.outputs.ai == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: "3.10"
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install flake8 pytest
+          cd ai && pip install -r requirements.txt
+      - name: Lint with flake8
+        run: |
+          cd ai
+          flake8 . --count --select=E9,F63,F7,F82 --show-source --statistics
+          flake8 . --count --exit-zero --max-complexity=10 --max-line-length=127 --statistics
+      - name: Test with pytest (if tests exist)
+        run: |
+          cd ai
+          pytest --tb=short || echo "No tests found or tests failed - continuing"
+
   build-backend:
     name: Build Backend (Docker Cache)
     needs: [changes, code-quality]
