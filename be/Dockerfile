@@ -1,25 +1,28 @@
-# Stage 1: Build
-# Sử dụng Node 22 bản nhẹ (alpine)
+# ===== Stage 1: Build =====
 FROM node:22-alpine AS builder
-# Đặt thư mục làm việc bên trong container
+
 WORKDIR /app
-# Copy file định nghĩa thư viện trước để tận dụng cache của Docker
+
 COPY package*.json ./
+
 RUN --mount=type=cache,target=/root/.npm \
     npm ci
+
 COPY . .
+
 RUN npm run build
 
-# Stage 2: Run
-# Dùng một image Node mới
+# ===== Stage 2: Production =====
 FROM node:22-alpine
+
 WORKDIR /app
-# Chỉ copy những thứ cần thiết từ giai đoạn Build sang
-COPY --from=builder /app/dist ./dist
+
 COPY --from=builder /app/package*.json ./
-# Chỉ cài đặt các thư viện cần để chạy (loại bỏ devDependencies)
-RUN npm ci --only=production
-# Render sẽ "bơm" port vào đây
+COPY --from=builder /app/dist ./dist
+
+# Tận dụng node_modules đã build sẵn, xóa devDeps thay vì cài lại từ đầu
+COPY --from=builder /app/node_modules ./node_modules
+RUN npm prune --omit=dev
+
 EXPOSE 3000
-# Lệnh khởi động Backend
-CMD ["node", "dist/main"]
+CMD ["node", "dist/main.js"]

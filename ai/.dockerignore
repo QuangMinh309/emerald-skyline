@@ -1,0 +1,23 @@
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+venv/
+.env
+
+.git/
+.gitignore
+
+node_modules/
+
+# AI models (rất nặng!)
+*.pt
+*.pth
+*.onnx
+
+# cache ML
+.cache/
+*.zip
+*.tar
+*.gz

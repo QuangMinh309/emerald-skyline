@@ -30,6 +30,10 @@ python -m venv venv
 .\venv\Scripts\activate
 ```
 
+```bash
+source venv/Scripts/activate
+```
+
 **Linux/macOS:**
 
 ```bash
@@ -52,7 +56,7 @@ cp .env.example .env
 ### 5. Chạy Service
 
 ```bash
-python -m app/main.py
+uvicorn app.main:app --reload
 ```
 
 Service sẽ chạy tại `http://localhost:8000`
@@ -191,7 +195,7 @@ MIT License - xem file LICENSE để biết thêm chi tiết.
 Sau khi đã cài đặt xong môi trường và thư viện, chạy lệnh sau để start server:
 ```
 
-python -m app/main.py
+uvicorn app.main:app --reload
 
 ```
 
