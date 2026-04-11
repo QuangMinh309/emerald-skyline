@@ -10,9 +10,9 @@ export class SeedDefaultAccounts1704370000000 implements MigrationInterface {
 		await queryRunner.query(`
       INSERT INTO accounts (email, password, role, is_active, created_at, updated_at)
       VALUES 
-        ('admin@gmail.com', '${adminPassword}', 'ADMIN', true, NOW(), NOW()),
-        ('resident@gmail.com', '${residentPassword}', 'RESIDENT', true, NOW(), NOW()),
-        ('technician@gmail.com', '${technicianPassword}', 'TECHNICIAN', true, NOW(), NOW())
+        ('admin@emerald.com', '${adminPassword}', 'ADMIN', true, NOW(), NOW()),
+        ('resident@emerald.com', '${residentPassword}', 'RESIDENT', true, NOW(), NOW()),
+        ('technician@emerald.com', '${technicianPassword}', 'TECHNICIAN', true, NOW(), NOW())
       ON CONFLICT (email) DO NOTHING;
     `);
 	}
@@ -20,7 +20,7 @@ export class SeedDefaultAccounts1704370000000 implements MigrationInterface {
 	public async down(queryRunner: QueryRunner): Promise<void> {
 		await queryRunner.query(`
       DELETE FROM accounts 
-      WHERE email IN ('admin@gmail.com', 'resident@gmail.com', 'technician@gmail.com');
+      WHERE email IN ('admin@emerald.com', 'resident@emerald.com', 'technician@emerald.com');
     `);
 	}
 }
