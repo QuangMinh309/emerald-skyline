@@ -108,6 +108,23 @@ export class InvoicesService {
 		return dueDate;
 	}
 
+	private getVietnamCurrentDate(): Date {
+		const vnOffsetMs = 7 * 60 * 60 * 1000;
+		return new Date(Date.now() + vnOffsetMs);
+	}
+
+	private assertClientInvoiceCreationWindow(): void {
+		const currentVnDate = this.getVietnamCurrentDate();
+		const currentVnDay = currentVnDate.getUTCDate();
+
+		if (currentVnDay < 20 || currentVnDay > 25) {
+			throw new HttpException(
+				"Chỉ được tạo hóa đơn từ ngày 20 đến ngày 25 hàng tháng",
+				HttpStatus.BAD_REQUEST,
+			);
+		}
+	}
+
 	private extractCloudinaryUrl(uploadResult: unknown): string | undefined {
 		if (!uploadResult || typeof uploadResult !== "object") {
 			return undefined;
@@ -661,6 +678,8 @@ export class InvoicesService {
 		files: Express.Multer.File[],
 	): Promise<Invoice> {
 		const { waterIndex, electricityIndex, apartmentId } = createInvoiceDto;
+
+		this.assertClientInvoiceCreationWindow();
 
 		// Xác thực cư dân sở hữu căn hộ này
 		const resident = await this.residentRepository.findOne({
