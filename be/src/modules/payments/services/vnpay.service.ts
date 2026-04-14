@@ -31,8 +31,10 @@ export class VNPayService {
 	createPayment(request: VNPayPaymentRequest): VNPayPaymentResponse {
 		const { orderId, amount, orderInfo, returnUrl, ipAddr } = request;
 
-		const createDate = this.formatDate(new Date());
-		const expireDate = this.formatDate(new Date(Date.now() + 15 * 60 * 1000)); // 15 minutes
+		const createDate = this.formatDateInVnTimezone(new Date());
+		const expireDate = this.formatDateInVnTimezone(
+			new Date(Date.now() + 15 * 60 * 1000),
+		); // 15 minutes
 
 		let vnpParams: any = {
 			vnp_Version: "2.1.0",
@@ -92,13 +94,17 @@ export class VNPayService {
 		return sorted;
 	}
 
-	private formatDate(date: Date): string {
-		const year = date.getFullYear();
-		const month = String(date.getMonth() + 1).padStart(2, "0");
-		const day = String(date.getDate()).padStart(2, "0");
-		const hours = String(date.getHours()).padStart(2, "0");
-		const minutes = String(date.getMinutes()).padStart(2, "0");
-		const seconds = String(date.getSeconds()).padStart(2, "0");
+	private formatDateInVnTimezone(date: Date): string {
+		// VNPay expects timestamps in GMT+7 (Vietnam time).
+		const vnOffsetMs = 7 * 60 * 60 * 1000;
+		const vnDate = new Date(date.getTime() + vnOffsetMs);
+
+		const year = vnDate.getUTCFullYear();
+		const month = String(vnDate.getUTCMonth() + 1).padStart(2, "0");
+		const day = String(vnDate.getUTCDate()).padStart(2, "0");
+		const hours = String(vnDate.getUTCHours()).padStart(2, "0");
+		const minutes = String(vnDate.getUTCMinutes()).padStart(2, "0");
+		const seconds = String(vnDate.getUTCSeconds()).padStart(2, "0");
 		return `${year}${month}${day}${hours}${minutes}${seconds}`;
 	}
 }
