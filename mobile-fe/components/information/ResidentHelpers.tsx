@@ -23,15 +23,26 @@ export const displayValue = (val: string | number | null | undefined) => {
 };
 
 export const parseDateString = (dateStr: string | null | undefined) => {
-  if (!dateStr) return new Date();
+  const fallback = new Date();
+  if (!dateStr) return fallback;
+
   try {
-    const parts = dateStr.split("-");
+    // Accept both YYYY-MM-DD and ISO strings from backend
+    const dateOnly = dateStr.includes("T") ? dateStr.split("T")[0] : dateStr;
+    const parts = dateOnly.split("-");
+
     if (parts.length === 3) {
-      return new Date(Number(parts[0]), Number(parts[1]) - 1, Number(parts[2]));
+      const y = Number(parts[0]);
+      const m = Number(parts[1]);
+      const d = Number(parts[2]);
+      const parsed = new Date(y, m - 1, d);
+      return Number.isNaN(parsed.getTime()) ? fallback : parsed;
     }
-    return new Date(dateStr);
+
+    const parsed = new Date(dateStr);
+    return Number.isNaN(parsed.getTime()) ? fallback : parsed;
   } catch (e) {
-    return new Date();
+    return fallback;
   }
 };
 
@@ -48,8 +59,11 @@ export const formatDateForAPI = (date: Date) => {
 
 export const formatDateDisplay = (dateStr: string | null | undefined) => {
   if (!dateStr) return "Chưa cập nhật";
-  const parts = dateStr.split("-");
+
+  const dateOnly = dateStr.includes("T") ? dateStr.split("T")[0] : dateStr;
+  const parts = dateOnly.split("-");
   if (parts.length === 3) return `${parts[2]}/${parts[1]}/${parts[0]}`;
+
   return dateStr;
 };
 

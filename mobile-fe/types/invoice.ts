@@ -63,6 +63,6 @@ export interface MeterReadingPayload {
   apartmentId: number;
   waterIndex: number;
   electricityIndex: number;
-  waterImage: string;
-  electricityImage: string;
+  waterImage?: string;
+  electricityImage?: string;
 }

@@ -31,10 +31,19 @@ export const useSubmitMeterReading = () => {
     },
 
     onError: (error: any) => {
-      // console.error("Lỗi tạo hóa đơn:", error);
-      const msg =
-        error.response?.data?.message ||
+      console.error("[SubmitMeterReading] error", {
+        status: error?.response?.status,
+        data: error?.response?.data,
+        message: error?.message,
+      });
+
+      const raw =
+        error?.response?.data?.message ??
+        error?.response?.data?.detail ??
+        error?.message ??
         "Có lỗi xảy ra khi gửi chỉ số. Vui lòng thử lại.";
+
+      const msg = Array.isArray(raw) ? raw.join("\n") : String(raw);
       Alert.alert("Gửi thất bại", msg);
     },
   });

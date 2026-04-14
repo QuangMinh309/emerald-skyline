@@ -19,6 +19,41 @@ export enum PaymentTargetType {
   BOOKING = "BOOKING",
 }
 
+export interface InvoiceHistory {
+  id: string;
+  invoiceCode: string;
+  title: string;
+  amount: number;
+  status: "paid" | "unpaid" | "overdue";
+  dueDate: string;
+}
+
+export interface MonthlyInvoiceItem {
+  id: string;
+  name: string;
+  amount: number;
+  type: string;
+  period: string;
+}
+
+export interface MonthlyInvoice {
+  id: string;
+  invoiceCode: string;
+  monthTitle: string;
+  period: string;
+  totalAmount: number;
+  status: "paid" | "unpaid" | "overdue";
+  items: MonthlyInvoiceItem[];
+}
+
+export interface StatisticsItem {
+  month: string;
+  elec: string;
+  water: string;
+  service: string;
+  total: string;
+}
+
 /**
  * Payment Transaction - Lịch sử giao dịch
  */

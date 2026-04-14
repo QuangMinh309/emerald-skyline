@@ -3,11 +3,35 @@ import { api } from "./api";
 
 const BASE = "residents";
 
+const buildDemoResidentProfile = (authProfile: any): ResidentResponse => ({
+  id: authProfile?.id || 0,
+  accountId: authProfile?.id || 0,
+  isFallbackProfile: true,
+  fullName: authProfile?.email?.split("@")[0] || "Resident Demo",
+  citizenId: "",
+  imageUrl: null,
+  dob: new Date("1995-01-01").toISOString(),
+  gender: "OTHER",
+  phoneNumber: "",
+  email: authProfile?.email || "resident@gmail.com",
+  nationality: "Việt Nam",
+  province: "",
+  district: "",
+  ward: "",
+  detailAddress: "",
+  isActive: true,
+  apartments: [],
+});
+
 export const getResidentProfile = async (): Promise<ResidentResponse> => {
   try {
     const response = await api.get(`${BASE}/me`);
     return response.data.data;
-  } catch (err) {
+  } catch (err: any) {
+    if (err?.response?.status === 404) {
+      const authResponse = await api.get("/auth/profile");
+      return buildDemoResidentProfile(authResponse?.data?.data || authResponse?.data);
+    }
     throw err;
   }
 };

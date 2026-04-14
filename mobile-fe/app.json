@@ -1,7 +1,8 @@
 {
   "expo": {
-    "name": "mobile-fe",
-    "slug": "mobile-fe",
+    "name": "Emerald Skyline",
+    "slug": "emerald-skyline-mobile",
+    "scheme": "emerald-skyline",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",

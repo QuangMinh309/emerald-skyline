@@ -22,6 +22,7 @@ export interface ResidentApartment {
 export interface ResidentResponse {
   id: number;
   accountId: number;
+  isFallbackProfile?: boolean;
   fullName: string;
   citizenId: string;
   imageUrl: string | null;

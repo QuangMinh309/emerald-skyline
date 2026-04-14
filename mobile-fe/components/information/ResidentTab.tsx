@@ -210,6 +210,14 @@ export const ResidentTab = ({ data }: ResidentTabProps) => {
   };
 
   const onSubmit: SubmitHandler<any> = (formData) => {
+    if (data.isFallbackProfile) {
+      Alert.alert(
+        "Chưa có hồ sơ cư dân",
+        "Tài khoản này chưa được liên kết hồ sơ cư dân trên hệ thống. Vui lòng liên hệ quản trị để tạo hồ sơ cư dân trước khi chỉnh sửa thông tin.",
+      );
+      return;
+    }
+
     // nếu không phải VN thì clear địa chỉ hành chính
     if (!isVietnam) {
       formData.province = "";
@@ -244,8 +252,11 @@ export const ResidentTab = ({ data }: ResidentTabProps) => {
           setIsEditing(false);
         },
         onError: (err: any) => {
-          console.log(err);
-          Alert.alert("Lỗi", "Cập nhật thất bại.");
+          const raw =
+            err?.response?.data?.message ??
+            err?.message ??
+            "Cập nhật thất bại.";
+          Alert.alert("Lỗi", toMessageString(raw));
         },
       },
     );
@@ -258,6 +269,18 @@ export const ResidentTab = ({ data }: ResidentTabProps) => {
 
   return (
     <View className="mb-4">
+      {data.isFallbackProfile && (
+        <View className="mb-4 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3">
+          <Text className="text-amber-800 font-semibold text-base">
+            Tài khoản resident này chưa có thông tin.
+          </Text>
+          <Text className="text-amber-700 mt-1 text-sm leading-5">
+            Hệ thống chưa ghi nhận hồ sơ cư dân cho tài khoản này, nên không có
+            dữ liệu để hiển thị hoặc chỉnh sửa.
+          </Text>
+        </View>
+      )}
+
       <View className="items-center mb-6 mt-2">
         <TouchableOpacity
           onPress={onAvatarPress}
@@ -323,9 +346,16 @@ export const ResidentTab = ({ data }: ResidentTabProps) => {
 
           <TouchableOpacity
             disabled={updateMutation.isPending}
-            onPress={() =>
-              isEditing ? handleSubmit(onSubmit)() : setIsEditing(true)
-            }
+            onPress={() => {
+              if (!isEditing && data.isFallbackProfile) {
+                Alert.alert(
+                  "Chưa có hồ sơ cư dân",
+                  "Tài khoản này chưa có hồ sơ cư dân để cập nhật. Vui lòng liên hệ quản trị hệ thống.",
+                );
+                return;
+              }
+              isEditing ? handleSubmit(onSubmit)() : setIsEditing(true);
+            }}
             className={`px-4 py-1.5 rounded-full border flex-row items-center justify-center gap-2 ${
               isEditing ? "bg-[#E09B6B] border-[#E09B6B]" : "border-[#E09B6B]"
             }`}

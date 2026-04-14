@@ -5,12 +5,13 @@ import {
   getAccessToken,
   setAccessToken,
 } from "@/utils/auth-storage";
+import { resolveApiBaseUrl } from "@/utils/api-base-url";
 
-const baseURL = process.env.EXPO_PUBLIC_API_URL;
+const baseURL = resolveApiBaseUrl();
 
 export const api = axios.create({
   baseURL,
-  timeout: 10000,
+  timeout: 30000,
   withCredentials: true,
   headers: {
     "Content-Type": "application/json",
@@ -19,7 +20,7 @@ export const api = axios.create({
 
 const refreshClient = axios.create({
   baseURL,
-  timeout: 10000,
+  timeout: 30000,
   withCredentials: true,
   headers: {
     "Content-Type": "application/json",
@@ -57,12 +58,27 @@ api.interceptors.request.use(async (config) => {
 api.interceptors.response.use(
   (response) => response,
   async (error: AxiosError) => {
+    const original = error.config as
+      | (AxiosRequestConfig & { _retry?: boolean; _networkRetry?: boolean })
+      | undefined;
+
+    // Handle temporary network timeout (common when Render cold starts)
+    if (
+      original &&
+      !error.response &&
+      !original._networkRetry &&
+      ["get", "GET"].includes(String(original.method || "get"))
+    ) {
+      original._networkRetry = true;
+      await new Promise((resolve) => setTimeout(resolve, 1200));
+      return api(original);
+    }
+
     if (!error.response) {
       return Promise.reject(error);
     }
 
     const status = error.response.status;
-    const original = error.config as AxiosRequestConfig & { _retry?: boolean };
     const url = String(original?.url ?? "");
 
     // Không refresh cho chính auth endpoints
@@ -78,7 +94,7 @@ api.interceptors.response.use(
     }
 
     // Chỉ xử lý 401 và chỉ retry 1 lần
-    if (status !== 401 || original._retry) return Promise.reject(error);
+    if (!original || status !== 401 || original._retry) return Promise.reject(error);
 
     // Nếu đang refresh -> đợi
     if (isRefreshing) {

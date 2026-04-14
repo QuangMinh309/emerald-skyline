@@ -1,18 +1,28 @@
 import { InvoiceResponse, MeterReadingPayload } from "@/types/invoice";
-import { Platform } from "react-native";
 import { api } from "./api";
 
 export const submitMeterReading = async (
   payload: MeterReadingPayload,
 ): Promise<InvoiceResponse> => {
-  const formData = new FormData();
+  const buildFormData = (includeImages: boolean) => {
+    const formData = new FormData();
 
-  formData.append("apartmentId", String(payload.apartmentId));
-  formData.append("waterIndex", String(payload.waterIndex));
-  formData.append("electricityIndex", String(payload.electricityIndex));
+    formData.append("apartmentId", String(payload.apartmentId));
+    formData.append("waterIndex", String(payload.waterIndex));
+    formData.append("electricityIndex", String(payload.electricityIndex));
+
+    if (includeImages && payload.waterImage) {
+      appendImage(formData, "waterImage", payload.waterImage);
+    }
+    if (includeImages && payload.electricityImage) {
+      appendImage(formData, "electricityImage", payload.electricityImage);
+    }
+
+    return formData;
+  };
 
   // tạo object ảnh chuẩn cho React Native
-  const appendImage = (fieldName: string, uri: string) => {
+  const appendImage = (formData: FormData, fieldName: string, uri: string) => {
     // lấy tên file từ đường dẫn hoặc random
     const filename = uri.split("/").pop() || `upload_${Date.now()}.jpg`;
 
@@ -22,35 +32,44 @@ export const submitMeterReading = async (
 
     // React Native yêu cầu object có dạng { uri, name, type }
     formData.append(fieldName, {
-      uri: Platform.OS === "ios" ? uri.replace("file://", "") : uri,
+      uri,
       name: filename,
       type: type,
     } as any);
   };
 
-  // append ảnh (chắc chắn uri không null vì đã validate ở UI)
-  appendImage("waterImage", payload.waterImage);
-  appendImage("electricityImage", payload.electricityImage);
-
-  try {
-    const response = await api.post("/invoices/client", formData, {
-      headers: {
-        "Content-Type": "multipart/form-data",
-      },
-      transformRequest: (data) => data,
-      timeout: 60000,
-    });
-    return response.data;
-  } catch (error: any) {
-    throw error;
-  }
+  const response = await api.post("/invoices/client", buildFormData(true), {
+    headers: {
+      "Content-Type": "multipart/form-data",
+    },
+    transformRequest: (data) => data,
+    timeout: 60000,
+  });
+  return response.data;
 };
 
 export const getResidentInvoices = async (): Promise<InvoiceResponse[]> => {
-  const response = await api.get<{ data: { invoices: InvoiceResponse[] } }>(
-    "/residents/me/invoices",
-  );
-  return response.data.data.invoices;
+  const tryGet = async (url: string) => {
+    const response = await api.get<any>(url);
+    const payload = response?.data?.data;
+    if (Array.isArray(payload)) return payload as InvoiceResponse[];
+    if (Array.isArray(payload?.invoices)) return payload.invoices as InvoiceResponse[];
+    return [];
+  };
+
+  try {
+    return await tryGet("/residents/me/invoices");
+  } catch (error: any) {
+    if (error?.response?.status !== 404) throw error;
+  }
+
+  try {
+    return await tryGet("/invoices/client-created/list");
+  } catch (error: any) {
+    if (error?.response?.status !== 404) throw error;
+  }
+
+  return [];
 };
 
 export const getInvoiceDetail = async (id: number): Promise<InvoiceResponse> => {

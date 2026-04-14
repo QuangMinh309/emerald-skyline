@@ -5,14 +5,19 @@ import { Text, View } from "react-native";
 
 interface ApartmentTabProps {
   data: ResidentApartment[];
+  isFallbackProfile?: boolean;
 }
 
-export const ApartmentTab = ({ data }: ApartmentTabProps) => {
+export const ApartmentTab = ({ data, isFallbackProfile }: ApartmentTabProps) => {
   if (!data || data.length === 0) {
     return (
       <View className="mt-10 items-center justify-center">
         <Building2 size={48} color="#D1D5DB" />
-        <Text className="text-gray-400 mt-2 text-base">Chưa có thông tin căn hộ</Text>
+        <Text className="text-gray-400 mt-2 text-base text-center px-6">
+          {isFallbackProfile
+            ? "Tài khoản resident này chưa có thông tin, nên không có căn hộ nào."
+            : "Chưa có thông tin căn hộ"}
+        </Text>
       </View>
     );
   }

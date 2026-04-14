@@ -1,9 +1,7 @@
 import type { AuthResponse, AuthUser } from "@/types/auth";
 import { api } from "@/services/api";
-const baseURL = process.env.EXPO_PUBLIC_API_URL || "http://localhost:8080/api";
 
 export const login = async (email: string, password: string) => {
-  console.log("Base URL:", baseURL);
   console.log("Attempting login with email:", email);
   const response = await api.post("/auth/login", { email, password });
   console.log("Login response:", response.data);
