@@ -108,6 +108,54 @@ export class InvoicesService {
 		return dueDate;
 	}
 
+	private extractCloudinaryUrl(uploadResult: unknown): string | undefined {
+		if (!uploadResult || typeof uploadResult !== "object") {
+			return undefined;
+		}
+
+		const payload = uploadResult as Record<string, unknown>;
+		const secureUrl = payload.secure_url;
+		if (typeof secureUrl === "string" && secureUrl.length > 0) {
+			return secureUrl;
+		}
+
+		const url = payload.url;
+		if (typeof url === "string" && url.length > 0) {
+			return url;
+		}
+
+		return undefined;
+	}
+
+	private async uploadProofImages(files?: Express.Multer.File[]): Promise<string | undefined> {
+		if (!files?.length) {
+			return undefined;
+		}
+
+		const uploadedImageUrls: string[] = [];
+
+		for (const file of files) {
+			try {
+				const uploadResult = await this.cloudinaryService.uploadFile(file);
+				const uploadedUrl = this.extractCloudinaryUrl(uploadResult);
+				if (uploadedUrl) {
+					uploadedImageUrls.push(uploadedUrl);
+				}
+			} catch (error) {
+				console.error("[Invoice][Client] Upload image failed, continue without this image:", {
+					fileName: file.originalname,
+					error: error instanceof Error ? error.message : error,
+				});
+			}
+		}
+
+		if (!uploadedImageUrls.length) {
+			return undefined;
+		}
+
+		return uploadedImageUrls.join(",");
+	}
+
 	/**
 	 * Check nếu invoice đã quá hạn (OVERDUE)
 	 * @param dueDate - ngày hết hạn
@@ -674,17 +722,8 @@ export class InvoicesService {
 			);
 		}
 
-		// Upload ảnh chứng minh
-		let imageProofUrl: string | undefined;
-		if (files && files.length > 0) {
-			const uploadedImages = await Promise.all(
-				files.map((file) => this.cloudinaryService.uploadFile(file)),
-			);
-			// Lưu URL ảnh đầu tiên hoặc nối nhiều URL lại
-			imageProofUrl = uploadedImages
-				.map((img) => (img?.url as string) || "")
-				.join(",");
-		}
+		// Upload ảnh chứng minh (nếu upload lỗi, vẫn cho phép tạo hóa đơn để cư dân không bị chặn luồng)
+		const imageProofUrl = await this.uploadProofImages(files);
 
 		// Tạo invoice code
 		const invoiceCode = await this.generateInvoiceCode(apartmentId, periodDate);
