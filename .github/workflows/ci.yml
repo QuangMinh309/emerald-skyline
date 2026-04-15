@@ -205,22 +205,46 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - uses: actions/setup-java@v4
+      - name: Setup Java 17
+        uses: actions/setup-java@v4
         with:
           java-version: "17"
           distribution: "temurin"
 
-      - name: Install JS Dependencies
-        run: cd mobile-fe && npm ci
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: "npm"
+          cache-dependency-path: mobile-fe/package-lock.json
 
-      - name: Build APK
-        run: cd mobile-fe/android && ./gradlew assembleDebug
+      - name: Install JS Dependencies
+        run: |
+          cd mobile-fe
+          npm ci
+
+      # Tạo thư mục Android nếu chưa tồn tại
+      - name: Expo Prebuild (Generate Native Android Folder)
+        run: |
+          cd mobile-fe
+          npx expo prebuild --platform android --no-install
+
+      - name: Build APK with Gradle
+        run: |
+          cd mobile-fe/android
+          chmod +x gradlew
+          ./gradlew assembleDebug
 
       - name: Size Monitor
         run: |
-          echo "### APK Size" >> $GITHUB_STEP_SUMMARY
-          du -sh mobile-fe/android/app/build/outputs/apk/debug/app-debug.apk \
-            >> $GITHUB_STEP_SUMMARY
+          echo "### APK Size Report" >> $GITHUB_STEP_SUMMARY
+          APK_PATH="mobile-fe/android/app/build/outputs/apk/debug/app-debug.apk"
+          if [ -f "$APK_PATH" ]; then
+            du -sh $APK_PATH >> $GITHUB_STEP_SUMMARY
+          else
+            echo "APK file not found" >> $GITHUB_STEP_SUMMARY
+            exit 1
+          fi
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
