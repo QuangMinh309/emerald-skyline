@@ -1,0 +1,11 @@
+Mở venv:
+source venv/Scripts/activate
+
+Cài tạm ngrok:
+npx ngrok http 8000
+
+Chạy App AI:
+uvicorn app.main:app --reload
+
+Chạy Ngrok:
+ngrok http --url=linked-exes-reclining.ngrok-free.dev 8000

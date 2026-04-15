@@ -198,7 +198,7 @@ jobs:
   release-mobile:
     name: Build & Release APK
     needs: [changes]
-    if: startsWith(github.ref, 'refs/tags/v') && needs.changes.outputs.mobile == 'true'
+    if: startsWith(github.ref, 'refs/tags/v')
     runs-on: ubuntu-latest
     permissions:
       contents: write
