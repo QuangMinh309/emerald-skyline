@@ -21,8 +21,6 @@ jobs:
       - uses: actions/checkout@v4
       - name: Run actionlint (config smell gate)
         uses: rhysd/actionlint@v1.7.7
-        with:
-          fail-on-error: true
 
   changes:
     name: Detect Changed Paths
@@ -68,7 +66,7 @@ jobs:
       # D1 — Lead Time: ghi timestamp bắt đầu pipeline
       - name: Record Pipeline Start Time
         id: record_start
-        run: echo "start_time=$(date -u +%s)" >> $GITHUB_OUTPUT
+        run: echo "start_time=$(date -u +%s)" >> "$GITHUB_OUTPUT"
 
       - uses: biomejs/setup-biome@v2
       - name: Biome CI (hard gate)
@@ -128,7 +126,7 @@ jobs:
 
       - name: Record build start
         id: build_start
-        run: echo "t=$(date -u +%s)" >> $GITHUB_OUTPUT
+        run: echo "t=$(date -u +%s)" >> "$GITHUB_OUTPUT"
 
       - name: Build Docker Image (GHA cache, mode=max)
         uses: docker/build-push-action@v6
@@ -159,7 +157,7 @@ jobs:
 
       - name: Record build start
         id: build_start
-        run: echo "t=$(date -u +%s)" >> $GITHUB_OUTPUT
+        run: echo "t=$(date -u +%s)" >> "$GITHUB_OUTPUT"
 
       - name: Build AI Image (GHA cache, mode=max)
         uses: docker/build-push-action@v6
@@ -194,7 +192,7 @@ jobs:
 
       - name: Record build start
         id: build_start
-        run: echo "t=$(date -u +%s)" >> $GITHUB_OUTPUT
+        run: echo "t=$(date -u +%s)" >> "$GITHUB_OUTPUT"
 
       - name: Deterministic Dependency Installation
         run: cd web-fe && npm ci
@@ -210,37 +208,35 @@ jobs:
           DIST_DIR="web-fe/dist"
           [ -d "$DIST_DIR" ] || DIST_DIR="web-fe/build"
 
-          echo "### Frontend Build Analytics" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
+          GZIP_SIZE=$(find "$DIST_DIR" -type f -print0 | xargs -0r gzip -c | wc -c)
+          GZIP_MB=$(echo "scale=2; ${GZIP_SIZE} / 1048576" | bc)
 
-          # D1 — Frontend build time
-          echo "**Build duration:** \`${BUILD_DURATION}s\` (target: < 120s cached)" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
+          {
+            echo "### Frontend Build Analytics"
+            echo ""
+            echo "**Build duration:** \`${BUILD_DURATION}s\` (target: < 120s cached)"
+            echo ""
 
-          # D4 — Bundle size raw
-          echo "#### Bundle Size — Raw" >> $GITHUB_STEP_SUMMARY
-          echo '```text' >> $GITHUB_STEP_SUMMARY
-          du -sh "$DIST_DIR" >> $GITHUB_STEP_SUMMARY
-          echo '```' >> $GITHUB_STEP_SUMMARY
+            echo "#### Bundle Size — Raw"
+            echo '```text'
+            du -sh "$DIST_DIR"
+            echo '```'
 
-          # D4 — Bundle size gzip (Best Practice: target < 2MB gzipped)
-          echo "#### Bundle Size — Gzip Estimate (Best Practice)" >> $GITHUB_STEP_SUMMARY
-          GZIP_SIZE=$(find "$DIST_DIR" -type f | xargs gzip -c | wc -c)
-          GZIP_MB=$(echo "scale=2; $GZIP_SIZE / 1048576" | bc)
-          echo "**Estimated gzip total:** \`${GZIP_MB} MB\` (target: < 2 MB)" >> $GITHUB_STEP_SUMMARY
-          if (( $(echo "$GZIP_MB < 2" | bc -l) )); then
-            echo "**Status:** PASS - Within target" >> $GITHUB_STEP_SUMMARY
-          else
-            echo "**Status:** FAIL - Exceeds 2 MB gzip target (consider code splitting)" >> $GITHUB_STEP_SUMMARY
-          fi
-          echo "" >> $GITHUB_STEP_SUMMARY
+            echo "#### Bundle Size — Gzip Estimate (Best Practice)"
+            echo "**Estimated gzip total:** \`${GZIP_MB} MB\` (target: < 2 MB)"
+            if [ "$(echo "${GZIP_MB} < 2" | bc -l)" -eq 1 ]; then
+              echo "**Status:** PASS - Within target"
+            else
+              echo "**Status:** FAIL - Exceeds 2 MB gzip target (consider code splitting)"
+            fi
+            echo ""
 
-          # D4 — Top 5 largest files
-          echo "#### Top 5 Largest Files" >> $GITHUB_STEP_SUMMARY
-          echo "| File Path | Size |" >> $GITHUB_STEP_SUMMARY
-          echo "| :--- | :--- |" >> $GITHUB_STEP_SUMMARY
-          find "$DIST_DIR" -type f -exec du -h {} + | sort -rh | head -n 5 \
-            | awk '{print "| " $2 " | " $1 " |"}' >> $GITHUB_STEP_SUMMARY
+            echo "#### Top 5 Largest Files"
+            echo "| File Path | Size |"
+            echo "| :--- | :--- |"
+            find "$DIST_DIR" -type f -exec du -h {} + | sort -rh | head -n 5 \
+              | awk '{print "| " $2 " | " $1 " |"}'
+          } >> "$GITHUB_STEP_SUMMARY"
 
   deploy-backend:
     name: Deploy Backend to Render
@@ -327,7 +323,7 @@ jobs:
 
       - name: Record build start
         id: build_start
-        run: echo "t=$(date -u +%s)" >> $GITHUB_OUTPUT
+        run: echo "t=$(date -u +%s)" >> "$GITHUB_OUTPUT"
 
       - name: Build APK with Gradle
         run: |
@@ -341,28 +337,29 @@ jobs:
           BUILD_DURATION=$(( BUILD_END - ${{ steps.build_start.outputs.t }} ))
           APK_PATH="mobile-fe/android/app/build/outputs/apk/debug/app-debug.apk"
 
-          echo "### Mobile APK Report" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-
           if [ -f "$APK_PATH" ]; then
             APK_SIZE_HUMAN=$(du -sh "$APK_PATH" | cut -f1)
             APK_SIZE_BYTES=$(du -sb "$APK_PATH" | cut -f1)
-            APK_SIZE_MB=$(echo "scale=2; $APK_SIZE_BYTES / 1048576" | bc)
+            APK_SIZE_MB=$(echo "scale=2; ${APK_SIZE_BYTES} / 1048576" | bc)
 
-            echo "| Metric | Value |" >> $GITHUB_STEP_SUMMARY
-            echo "| :--- | :--- |" >> $GITHUB_STEP_SUMMARY
-            echo "| APK size (human) | \`${APK_SIZE_HUMAN}\` |" >> $GITHUB_STEP_SUMMARY
-            echo "| APK size (MB) | \`${APK_SIZE_MB} MB\` (target: < 50 MB debug) |" >> $GITHUB_STEP_SUMMARY
-            echo "| APK size (bytes) | \`${APK_SIZE_BYTES}\` |" >> $GITHUB_STEP_SUMMARY
-            echo "| Build duration | \`${BUILD_DURATION}s\` |" >> $GITHUB_STEP_SUMMARY
-            echo "| Tag | \`${{ github.ref_name }}\` |" >> $GITHUB_STEP_SUMMARY
+            {
+              echo "### Mobile APK Report"
+              echo ""
+              echo "| Metric | Value |"
+              echo "| :--- | :--- |"
+              echo "| APK size (human) | \`${APK_SIZE_HUMAN}\` |"
+              echo "| APK size (MB) | \`${APK_SIZE_MB} MB\` (target: < 50 MB debug) |"
+              echo "| APK size (bytes) | \`${APK_SIZE_BYTES}\` |"
+              echo "| Build duration | \`${BUILD_DURATION}s\` |"
+              echo "| Tag | \`${{ github.ref_name }}\` |"
 
-            if (( $(echo "$APK_SIZE_MB > 50" | bc -l) )); then
-              echo "" >> $GITHUB_STEP_SUMMARY
-              echo "**WARNING: APK exceeds 50 MB target for debug build**" >> $GITHUB_STEP_SUMMARY
-            fi
+              if [ "$(echo "${APK_SIZE_MB} > 50" | bc -l)" -eq 1 ]; then
+                echo ""
+                echo "**WARNING: APK exceeds 50 MB target for debug build**"
+              fi
+            } >> "$GITHUB_STEP_SUMMARY"
           else
-            echo "APK file not found at expected path: \`${APK_PATH}\`" >> $GITHUB_STEP_SUMMARY
+            echo "APK file not found at expected path: \`${APK_PATH}\`" >> "$GITHUB_STEP_SUMMARY"
             exit 1
           fi
 

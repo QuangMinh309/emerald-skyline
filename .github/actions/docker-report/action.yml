@@ -5,7 +5,7 @@ inputs:
     description: Report title shown in step summary
     required: true
   image_name:
-    description: Local Docker image tag to inspect (for example: emerald-be:latest)
+    description: "Local Docker image tag to inspect (for example: emerald-be:latest)"
     required: true
   build_start:
     description: Unix epoch seconds captured before the image build
@@ -24,26 +24,27 @@ runs:
         BUILD_END=$(date -u +%s)
         BUILD_DURATION=$(( BUILD_END - ${{ inputs.build_start }} ))
 
-        echo "### ${{ inputs.report_title }}" >> "$GITHUB_STEP_SUMMARY"
-        echo "" >> "$GITHUB_STEP_SUMMARY"
-
-        echo "#### Docker Image Size" >> "$GITHUB_STEP_SUMMARY"
-        echo "| Repository | Tag | Size |" >> "$GITHUB_STEP_SUMMARY"
-        echo "| :--- | :--- | :--- |" >> "$GITHUB_STEP_SUMMARY"
         IMAGE_REPO="${{ inputs.image_name }}"
         IMAGE_REPO="${IMAGE_REPO%%:*}"
-        docker image ls "$IMAGE_REPO" --format "| {{.Repository}} | {{.Tag}} | {{.Size}} |" >> "$GITHUB_STEP_SUMMARY"
 
         SIZE_BYTES=$(docker image inspect "${{ inputs.image_name }}" --format '{{.Size}}')
-        echo "Raw bytes: \`${SIZE_BYTES}\`" >> "$GITHUB_STEP_SUMMARY"
-        echo "" >> "$GITHUB_STEP_SUMMARY"
 
-        echo "#### Build Speed and Cache Proxy" >> "$GITHUB_STEP_SUMMARY"
-        echo "Build duration: \`${BUILD_DURATION}s\`" >> "$GITHUB_STEP_SUMMARY"
-        if [ "$BUILD_DURATION" -lt 60 ]; then
-          echo "Cache status: HIT (< 60s)" >> "$GITHUB_STEP_SUMMARY"
-        elif [ "$BUILD_DURATION" -lt 300 ]; then
-          echo "Cache status: PARTIAL/MISS (60-300s)" >> "$GITHUB_STEP_SUMMARY"
-        else
-          echo "Cache status: SLOW (> 300s)" >> "$GITHUB_STEP_SUMMARY"
-        fi
+        {
+          echo "### ${{ inputs.report_title }}"
+          echo ""
+          echo "#### Docker Image Size"
+          echo "| Repository | Tag | Size |"
+          echo "| :--- | :--- | :--- |"
+          docker image ls "$IMAGE_REPO" --format "| {{.Repository}} | {{.Tag}} | {{.Size}} |"
+          echo "Raw bytes: \`${SIZE_BYTES}\`"
+          echo ""
+          echo "#### Build Speed and Cache Proxy"
+          echo "Build duration: \`${BUILD_DURATION}s\`"
+          if [ "$BUILD_DURATION" -lt 60 ]; then
+            echo "Cache status: HIT (< 60s)"
+          elif [ "$BUILD_DURATION" -lt 300 ]; then
+            echo "Cache status: PARTIAL/MISS (60-300s)"
+          else
+            echo "Cache status: SLOW (> 300s)"
+          fi
+        } >> "$GITHUB_STEP_SUMMARY"
