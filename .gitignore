@@ -32,7 +32,13 @@ expo-env.d.ts
 .metro-health-check*
 /ios/
 /android/
+mobile-fe/android/
+mobile-fe/ios/
 .kotlin/
+*.apk
+*.aab
+*.ipa
+*.jar
 *.orig.*
 *.jks
 *.p8

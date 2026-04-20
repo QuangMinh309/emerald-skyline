@@ -1,0 +1,49 @@
+name: Docker Artifact Report
+description: Log Docker image size and cache status to GitHub Step Summary
+inputs:
+  report_title:
+    description: Report title shown in step summary
+    required: true
+  image_name:
+    description: Local Docker image tag to inspect (for example: emerald-be:latest)
+    required: true
+  build_start:
+    description: Unix epoch seconds captured before the image build
+    required: true
+runs:
+  using: composite
+  steps:
+    - name: Generate Docker Report
+      shell: bash
+      run: |
+        if [ -z "${{ inputs.image_name }}" ] || [ -z "${{ inputs.build_start }}" ]; then
+          echo "Missing required inputs: image_name and build_start"
+          exit 1
+        fi
+
+        BUILD_END=$(date -u +%s)
+        BUILD_DURATION=$(( BUILD_END - ${{ inputs.build_start }} ))
+
+        echo "### ${{ inputs.report_title }}" >> "$GITHUB_STEP_SUMMARY"
+        echo "" >> "$GITHUB_STEP_SUMMARY"
+
+        echo "#### Docker Image Size" >> "$GITHUB_STEP_SUMMARY"
+        echo "| Repository | Tag | Size |" >> "$GITHUB_STEP_SUMMARY"
+        echo "| :--- | :--- | :--- |" >> "$GITHUB_STEP_SUMMARY"
+        IMAGE_REPO="${{ inputs.image_name }}"
+        IMAGE_REPO="${IMAGE_REPO%%:*}"
+        docker image ls "$IMAGE_REPO" --format "| {{.Repository}} | {{.Tag}} | {{.Size}} |" >> "$GITHUB_STEP_SUMMARY"
+
+        SIZE_BYTES=$(docker image inspect "${{ inputs.image_name }}" --format '{{.Size}}')
+        echo "Raw bytes: \`${SIZE_BYTES}\`" >> "$GITHUB_STEP_SUMMARY"
+        echo "" >> "$GITHUB_STEP_SUMMARY"
+
+        echo "#### Build Speed and Cache Proxy" >> "$GITHUB_STEP_SUMMARY"
+        echo "Build duration: \`${BUILD_DURATION}s\`" >> "$GITHUB_STEP_SUMMARY"
+        if [ "$BUILD_DURATION" -lt 60 ]; then
+          echo "Cache status: HIT (< 60s)" >> "$GITHUB_STEP_SUMMARY"
+        elif [ "$BUILD_DURATION" -lt 300 ]; then
+          echo "Cache status: PARTIAL/MISS (60-300s)" >> "$GITHUB_STEP_SUMMARY"
+        else
+          echo "Cache status: SLOW (> 300s)" >> "$GITHUB_STEP_SUMMARY"
+        fi

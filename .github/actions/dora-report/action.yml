@@ -1,0 +1,46 @@
+name: DORA Deploy Report
+description: Log deploy-focused DORA metrics to GitHub Step Summary
+inputs:
+  report_title:
+    description: Section title shown in step summary
+    required: true
+  pipeline_start:
+    description: Unix epoch seconds captured at pipeline start
+    required: false
+    default: ""
+  deploy_status:
+    description: Step outcome for deploy trigger (success, failure, cancelled, skipped)
+    required: true
+runs:
+  using: composite
+  steps:
+    - name: Generate DORA Report
+      shell: bash
+      run: |
+        DEPLOY_END=$(date -u +%s)
+        TIMESTAMP=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
+
+        echo "### ${{ inputs.report_title }}" >> "$GITHUB_STEP_SUMMARY"
+        echo "" >> "$GITHUB_STEP_SUMMARY"
+        echo "| DORA Metric | Value |" >> "$GITHUB_STEP_SUMMARY"
+        echo "| :--- | :--- |" >> "$GITHUB_STEP_SUMMARY"
+        echo "| Deployment Frequency - timestamp | \`${TIMESTAMP}\` |" >> "$GITHUB_STEP_SUMMARY"
+
+        if [ -n "${{ inputs.pipeline_start }}" ]; then
+          LEAD_TIME=$(( DEPLOY_END - ${{ inputs.pipeline_start }} ))
+          LEAD_MIN=$(( LEAD_TIME / 60 ))
+          echo "| Lead Time for Changes | \`${LEAD_MIN} min (${LEAD_TIME}s)\` |" >> "$GITHUB_STEP_SUMMARY"
+          if [ "$LEAD_TIME" -lt 3600 ]; then
+            echo "| Lead Time status | PASS - Elite (< 1h) |" >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "| Lead Time status | FAIL - Exceeds 1h Elite threshold |" >> "$GITHUB_STEP_SUMMARY"
+          fi
+        fi
+
+        echo "| Change Failure Rate - outcome | \`${{ inputs.deploy_status }}\` |" >> "$GITHUB_STEP_SUMMARY"
+        echo "| Commit | \`${{ github.sha }}\` |" >> "$GITHUB_STEP_SUMMARY"
+
+        if [ "${{ inputs.deploy_status }}" = "failure" ]; then
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          echo "**DEPLOY FAILED - record \`${TIMESTAMP}\` as MTTR start point**" >> "$GITHUB_STEP_SUMMARY"
+        fi
