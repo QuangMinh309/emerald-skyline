@@ -1,29 +1,29 @@
 name: Emerald Skyline CI/CD
 env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+  NODE_VERSION: "22"
+  PYTHON_VERSION: "3.10"
+  JAVA_VERSION: "17"
+  JAVA_DISTRIBUTION: "temurin"
 
 on:
   push:
     branches: ["main"]
-    tags: ["v*"] # Kích hoạt build Mobile khi tạo tag v1.0.0, v1.1...
+    tags: ["v*"]
   pull_request:
     branches: ["main"]
 
 jobs:
-  # Auto label (chỉ chạy trên PR)
-  labeler:
-    name: Auto Label PR
+  lint-pipeline:
+    name: Lint Pipeline YAML (actionlint)
     runs-on: ubuntu-latest
-    permissions:
-      contents: read
-      pull-requests: write
-    if: github.event_name == 'pull_request'
     steps:
-      - uses: actions/labeler@v5
+      - uses: actions/checkout@v4
+      - name: Run actionlint (config smell gate)
+        uses: rhysd/actionlint@v1.7.7
         with:
-          sync-labels: true
+          fail-on-error: true
 
-  # Phân tích thay đổi (chạy song song với labeler)
   changes:
     name: Detect Changed Paths
     runs-on: ubuntu-latest
@@ -43,47 +43,80 @@ jobs:
             mobile: ['mobile-fe/**']
             ai:     ['ai/**']
 
-  # Kiểm tra chất lượng code
-  code-quality:
-    name: Check Quality (Biome)
+  labeler:
+    name: Auto Label PR
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: write
+    if: github.event_name == 'pull_request'
+    steps:
+      - uses: actions/labeler@v5
+        with:
+          sync-labels: true
+
+  code-quality:
+    name: Check Quality (Biome) + Record Start Time
+    runs-on: ubuntu-latest
+    outputs:
+      pipeline_start: ${{ steps.record_start.outputs.start_time }}
     steps:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
-      - uses: biomejs/setup-biome@v2
-      - run: biome ci --changed --since=main --no-errors-on-unmatched .
 
-  # Chỉ thực hiện ở các folder có thay đổi, và chạy song song để tiết kiệm thời gian
-  # Lint Python AI module
+      # D1 — Lead Time: ghi timestamp bắt đầu pipeline
+      - name: Record Pipeline Start Time
+        id: record_start
+        run: echo "start_time=$(date -u +%s)" >> $GITHUB_OUTPUT
+
+      - uses: biomejs/setup-biome@v2
+      - name: Biome CI (hard gate)
+        run: biome ci --changed --since=main --no-errors-on-unmatched .
+
   lint-ai:
-    name: Lint AI Service (Python)
-    needs: [changes]
+    name: Lint + Test AI Service (Python)
+    needs: [changes, code-quality]
     if: needs.changes.outputs.ai == 'true'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+
       - name: Set up Python
-        uses: actions/setup-python@v4
+        uses: actions/setup-python@v5
         with:
-          python-version: "3.10"
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: "pip"
+          cache-dependency-path: ai/requirements.txt
+
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install flake8 pytest
+          pip install flake8 pytest pytest-cov pytest-rerunfailures
           cd ai && pip install -r requirements.txt
-      - name: Lint with flake8
+
+      - name: Lint — Critical errors (hard gate)
         run: |
           cd ai
           flake8 . --count --select=E9,F63,F7,F82 --show-source --statistics
-          flake8 . --count --exit-zero --max-complexity=10 --max-line-length=127 --statistics
-      - name: Test with pytest (if tests exist)
+
+      - name: Lint — Complexity gate (hard block, max-complexity=10)
         run: |
           cd ai
-          pytest --tb=short || echo "No tests found or tests failed - continuing"
+          flake8 . --count --max-complexity=10 --max-line-length=127 --statistics
+
+      - name: Test with pytest (coverage gate >=80%, flaky detection)
+        run: |
+          cd ai
+          pytest --tb=short \
+                 --cov=. \
+                 --cov-report=term-missing \
+                 --cov-fail-under=80 \
+                 --reruns 2 \
+                 --reruns-delay 1
 
   build-backend:
-    name: Build Backend (Docker Cache)
+    name: Build Backend (Docker)
     needs: [changes, code-quality]
     if: needs.changes.outputs.be == 'true'
     runs-on: ubuntu-latest
@@ -93,8 +126,11 @@ jobs:
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
-      # Build Image với cơ chế lưu Cache lên GitHub Actions (GHA)
-      - name: Build Docker Image
+      - name: Record build start
+        id: build_start
+        run: echo "t=$(date -u +%s)" >> $GITHUB_OUTPUT
+
+      - name: Build Docker Image (GHA cache, mode=max)
         uses: docker/build-push-action@v6
         with:
           context: ./be
@@ -103,18 +139,15 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
-      - name: Size Monitor
-        run: |
-          echo "### Backend Artifact Report" >> $GITHUB_STEP_SUMMARY
-          echo "| Repository | Tag | Size |" >> $GITHUB_STEP_SUMMARY
-          echo "| :--- | :--- | :--- |" >> $GITHUB_STEP_SUMMARY
-          docker image ls emerald-be --format "| {{.Repository}} | {{.Tag}} | {{.Size}} |" >> $GITHUB_STEP_SUMMARY
-
-          echo -e "\n**Raw Data (Bytes):**" >> $GITHUB_STEP_SUMMARY
-          docker image inspect emerald-be --format '`emerald-be: {{.Size}} bytes`' >> $GITHUB_STEP_SUMMARY
+      - name: Artifact & Speed Report
+        uses: ./.github/actions/docker-report
+        with:
+          report_title: Backend Artifact Report
+          image_name: emerald-be:latest
+          build_start: ${{ steps.build_start.outputs.t }}
 
   build-ai:
-    name: Build AI Service (Docker Cache)
+    name: Build AI Service (Docker)
     needs: [changes, code-quality]
     if: needs.changes.outputs.ai == 'true'
     runs-on: ubuntu-latest
@@ -124,7 +157,11 @@ jobs:
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
-      - name: Build AI Image
+      - name: Record build start
+        id: build_start
+        run: echo "t=$(date -u +%s)" >> $GITHUB_OUTPUT
+
+      - name: Build AI Image (GHA cache, mode=max)
         uses: docker/build-push-action@v6
         with:
           context: ./ai
@@ -133,12 +170,12 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
-      - name: Size Monitor
-        run: |
-          echo "### AI Service Artifact Report" >> $GITHUB_STEP_SUMMARY
-          echo "| Repository | Tag | Size |" >> $GITHUB_STEP_SUMMARY
-          echo "| :--- | :--- | :--- |" >> $GITHUB_STEP_SUMMARY
-          docker image ls emerald-ai --format "| {{.Repository}} | {{.Tag}} | {{.Size}} |" >> $GITHUB_STEP_SUMMARY
+      - name: Artifact & Speed Report
+        uses: ./.github/actions/docker-report
+        with:
+          report_title: AI Service Artifact Report
+          image_name: emerald-ai:latest
+          build_start: ${{ steps.build_start.outputs.t }}
 
   build-frontend:
     name: Build React Web
@@ -148,12 +185,16 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Setup Node.js 22
+      - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: "22"
+          node-version: ${{ env.NODE_VERSION }}
           cache: "npm"
           cache-dependency-path: web-fe/package-lock.json
+
+      - name: Record build start
+        id: build_start
+        run: echo "t=$(date -u +%s)" >> $GITHUB_OUTPUT
 
       - name: Deterministic Dependency Installation
         run: cd web-fe && npm ci
@@ -161,43 +202,103 @@ jobs:
       - name: Production Build
         run: cd web-fe && npm run build
 
-      - name: Static Assets Analysis
+      - name: Bundle Size & Build Time Report
         run: |
+          BUILD_END=$(date -u +%s)
+          BUILD_DURATION=$(( BUILD_END - ${{ steps.build_start.outputs.t }} ))
+
+          DIST_DIR="web-fe/dist"
+          [ -d "$DIST_DIR" ] || DIST_DIR="web-fe/build"
+
           echo "### Frontend Build Analytics" >> $GITHUB_STEP_SUMMARY
-          echo "**Deployment Directory:** \`web-fe/dist\`" >> $GITHUB_STEP_SUMMARY
-          echo -e "\n**Total Bundle Size:**" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+
+          # D1 — Frontend build time
+          echo "**Build duration:** \`${BUILD_DURATION}s\` (target: < 120s cached)" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+
+          # D4 — Bundle size raw
+          echo "#### Bundle Size — Raw" >> $GITHUB_STEP_SUMMARY
           echo '```text' >> $GITHUB_STEP_SUMMARY
-          du -sh web-fe/dist 2>/dev/null || du -sh web-fe/build >> $GITHUB_STEP_SUMMARY
+          du -sh "$DIST_DIR" >> $GITHUB_STEP_SUMMARY
           echo '```' >> $GITHUB_STEP_SUMMARY
 
-          echo -e "\n**Top 5 Largest Files:**" >> $GITHUB_STEP_SUMMARY
+          # D4 — Bundle size gzip (Best Practice: target < 2MB gzipped)
+          echo "#### Bundle Size — Gzip Estimate (Best Practice)" >> $GITHUB_STEP_SUMMARY
+          GZIP_SIZE=$(find "$DIST_DIR" -type f | xargs gzip -c | wc -c)
+          GZIP_MB=$(echo "scale=2; $GZIP_SIZE / 1048576" | bc)
+          echo "**Estimated gzip total:** \`${GZIP_MB} MB\` (target: < 2 MB)" >> $GITHUB_STEP_SUMMARY
+          if (( $(echo "$GZIP_MB < 2" | bc -l) )); then
+            echo "**Status:** PASS - Within target" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "**Status:** FAIL - Exceeds 2 MB gzip target (consider code splitting)" >> $GITHUB_STEP_SUMMARY
+          fi
+          echo "" >> $GITHUB_STEP_SUMMARY
+
+          # D4 — Top 5 largest files
+          echo "#### Top 5 Largest Files" >> $GITHUB_STEP_SUMMARY
           echo "| File Path | Size |" >> $GITHUB_STEP_SUMMARY
           echo "| :--- | :--- |" >> $GITHUB_STEP_SUMMARY
-          find web-fe/dist -type f -exec du -h {} + | sort -rh | head -n 5 | awk '{print "| " $2 " | " $1 " |"}' >> $GITHUB_STEP_SUMMARY
+          find "$DIST_DIR" -type f -exec du -h {} + | sort -rh | head -n 5 \
+            | awk '{print "| " $2 " | " $1 " |"}' >> $GITHUB_STEP_SUMMARY
 
-  # Deploy (chỉ khi push lên main)
   deploy-backend:
     name: Deploy Backend to Render
-    needs: [changes, build-backend]
+    needs: [changes, build-backend, code-quality]
     if: github.ref == 'refs/heads/main' && needs.changes.outputs.be == 'true'
     runs-on: ubuntu-latest
     steps:
       - name: Trigger Render Deploy Hook
+        id: deploy
         run: curl -fsSL -X GET ${{ secrets.RENDER_BE_DEPLOY_HOOK }}
+
+      - name: Record DORA Metrics
+        if: always()
+        uses: ./.github/actions/dora-report
+        with:
+          report_title: Backend Deploy DORA Report
+          pipeline_start: ${{ needs.code-quality.outputs.pipeline_start }}
+          deploy_status: ${{ steps.deploy.outcome }}
+
+      - name: Notify Slack on Failure
+        if: failure()
+        run: |
+          curl -fsSL -X POST ${{ secrets.SLACK_WEBHOOK_URL }} \
+            -H "Content-Type: application/json" \
+            -d "{\"text\": \"*Backend deploy FAILED* on \`${{ github.ref_name }}\`\nCommit: \`${{ github.sha }}\`\nActor: ${{ github.actor }}\nRun: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}\"}"
 
   deploy-frontend:
     name: Deploy Frontend to Vercel
-    needs: [changes, build-frontend]
+    needs: [changes, build-frontend, code-quality]
     if: github.ref == 'refs/heads/main' && needs.changes.outputs.web == 'true'
     runs-on: ubuntu-latest
     steps:
       - name: Trigger Vercel Deploy Hook
+        id: deploy
         run: curl -fsSL -X GET ${{ secrets.VERCEL_DEPLOY_HOOK }}
 
-  # Mobile release (chỉ khi tạo tag v*)
+      - name: Record DORA Metrics
+        if: always()
+        uses: ./.github/actions/dora-report
+        with:
+          report_title: Frontend Deploy DORA Report
+          pipeline_start: ${{ needs.code-quality.outputs.pipeline_start }}
+          deploy_status: ${{ steps.deploy.outcome }}
+
+      - name: Notify Slack on Failure
+        if: failure()
+        run: |
+          curl -fsSL -X POST ${{ secrets.SLACK_WEBHOOK_URL }} \
+            -H "Content-Type: application/json" \
+            -d "{\"text\": \"*Frontend deploy FAILED* on \`${{ github.ref_name }}\`\nCommit: \`${{ github.sha }}\`\nActor: ${{ github.actor }}\nRun: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}\"}"
+
   release-mobile:
     name: Build & Release APK
     needs: [changes]
+    # NOTE (Jaspan 2018): mobile release là tag-based event (v*), không phải
+    # push thường. Tag chỉ được tạo khi mobile-fe có thay đổi thực sự,
+    # nên selective build được đảm bảo ở tầng quy trình, không phải qua
+    # paths-filter. Đây là ngoại lệ có chủ ý của path-based detection.
     if: startsWith(github.ref, 'refs/tags/v')
     runs-on: ubuntu-latest
     permissions:
@@ -205,29 +306,28 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Setup Java 17
+      - name: Setup Java
         uses: actions/setup-java@v4
         with:
-          java-version: "17"
-          distribution: "temurin"
+          java-version: ${{ env.JAVA_VERSION }}
+          distribution: ${{ env.JAVA_DISTRIBUTION }}
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: "22"
+          node-version: ${{ env.NODE_VERSION }}
           cache: "npm"
           cache-dependency-path: mobile-fe/package-lock.json
 
       - name: Install JS Dependencies
-        run: |
-          cd mobile-fe
-          npm ci
+        run: cd mobile-fe && npm ci
 
-      # Tạo thư mục Android nếu chưa tồn tại
-      - name: Expo Prebuild (Generate Native Android Folder)
-        run: |
-          cd mobile-fe
-          npx expo prebuild --platform android --no-install
+      - name: Expo Prebuild (Generate Native Android)
+        run: cd mobile-fe && npx expo prebuild --platform android --no-install
+
+      - name: Record build start
+        id: build_start
+        run: echo "t=$(date -u +%s)" >> $GITHUB_OUTPUT
 
       - name: Build APK with Gradle
         run: |
@@ -235,14 +335,34 @@ jobs:
           chmod +x gradlew
           ./gradlew assembleDebug
 
-      - name: Size Monitor
+      - name: APK Size & Build Time Report
         run: |
-          echo "### APK Size Report" >> $GITHUB_STEP_SUMMARY
+          BUILD_END=$(date -u +%s)
+          BUILD_DURATION=$(( BUILD_END - ${{ steps.build_start.outputs.t }} ))
           APK_PATH="mobile-fe/android/app/build/outputs/apk/debug/app-debug.apk"
+
+          echo "### Mobile APK Report" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+
           if [ -f "$APK_PATH" ]; then
-            du -sh $APK_PATH >> $GITHUB_STEP_SUMMARY
+            APK_SIZE_HUMAN=$(du -sh "$APK_PATH" | cut -f1)
+            APK_SIZE_BYTES=$(du -sb "$APK_PATH" | cut -f1)
+            APK_SIZE_MB=$(echo "scale=2; $APK_SIZE_BYTES / 1048576" | bc)
+
+            echo "| Metric | Value |" >> $GITHUB_STEP_SUMMARY
+            echo "| :--- | :--- |" >> $GITHUB_STEP_SUMMARY
+            echo "| APK size (human) | \`${APK_SIZE_HUMAN}\` |" >> $GITHUB_STEP_SUMMARY
+            echo "| APK size (MB) | \`${APK_SIZE_MB} MB\` (target: < 50 MB debug) |" >> $GITHUB_STEP_SUMMARY
+            echo "| APK size (bytes) | \`${APK_SIZE_BYTES}\` |" >> $GITHUB_STEP_SUMMARY
+            echo "| Build duration | \`${BUILD_DURATION}s\` |" >> $GITHUB_STEP_SUMMARY
+            echo "| Tag | \`${{ github.ref_name }}\` |" >> $GITHUB_STEP_SUMMARY
+
+            if (( $(echo "$APK_SIZE_MB > 50" | bc -l) )); then
+              echo "" >> $GITHUB_STEP_SUMMARY
+              echo "**WARNING: APK exceeds 50 MB target for debug build**" >> $GITHUB_STEP_SUMMARY
+            fi
           else
-            echo "APK file not found" >> $GITHUB_STEP_SUMMARY
+            echo "APK file not found at expected path: \`${APK_PATH}\`" >> $GITHUB_STEP_SUMMARY
             exit 1
           fi
 
@@ -252,3 +372,11 @@ jobs:
           files: mobile-fe/android/app/build/outputs/apk/debug/app-debug.apk
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      # D3 — Failure notification (Slack)
+      - name: Notify Slack on Failure
+        if: failure()
+        run: |
+          curl -fsSL -X POST ${{ secrets.SLACK_WEBHOOK_URL }} \
+            -H "Content-Type: application/json" \
+            -d "{\"text\": \"*Mobile release FAILED* for tag \`${{ github.ref_name }}\`\nRun: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}\"}"
