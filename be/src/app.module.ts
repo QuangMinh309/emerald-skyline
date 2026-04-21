@@ -16,6 +16,7 @@ import { BookingsModule } from "./modules/bookings/bookings.module";
 import { CloudinaryModule } from "./modules/cloudinary/cloudinary.module";
 import { FeesModule } from "./modules/fees/fees.module";
 import { InvoicesModule } from "./modules/invoices/invoices.module";
+import { IssuesModule } from "./modules/issues/issues.module";
 import { MailerModule } from "./modules/mailer/mailer.module";
 import { MaintenanceTicketsModule } from "./modules/maintenance-tickets/maintenance-tickets.module";
 import { NotificationsModule } from "./modules/notifications/notifications.module";
@@ -58,6 +59,7 @@ import { TechniciansModule } from "./modules/technicians/technicians.module";
 		AssetsModule,
 		MaintenanceTicketsModule,
 		TechniciansModule,
+		IssuesModule,
 	],
 	controllers: [AppController],
 	providers: [AppService],
