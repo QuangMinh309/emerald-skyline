@@ -7,7 +7,6 @@ env/
 
 # Environment Variables
 .env
-.env.*
 *.local
 
 # =========================================
