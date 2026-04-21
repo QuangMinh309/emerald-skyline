@@ -17,6 +17,7 @@ import { CloudinaryModule } from "./modules/cloudinary/cloudinary.module";
 import { FeesModule } from "./modules/fees/fees.module";
 import { InvoicesModule } from "./modules/invoices/invoices.module";
 import { MailerModule } from "./modules/mailer/mailer.module";
+import { MaintenanceTicketsModule } from "./modules/maintenance-tickets/maintenance-tickets.module";
 import { NotificationsModule } from "./modules/notifications/notifications.module";
 import { PaymentsModule } from "./modules/payments/payments.module";
 import { ResidentsModule } from "./modules/residents/residents.module";
@@ -24,6 +25,7 @@ import { ServicesModule } from "./modules/services/services.module";
 import { SocketsModule } from "./modules/sockets/sockets.module";
 import { SupabaseStorageModule } from "./modules/supabase-storage/supabase-storage.module";
 import { SystemNotificationsModule } from "./modules/system-notifications/system-notifications.module";
+import { TechniciansModule } from "./modules/technicians/technicians.module";
 
 @Module({
 	imports: [
@@ -54,6 +56,8 @@ import { SystemNotificationsModule } from "./modules/system-notifications/system
 		NotificationsModule,
 		AssetTypesModule,
 		AssetsModule,
+		MaintenanceTicketsModule,
+		TechniciansModule,
 	],
 	controllers: [AppController],
 	providers: [AppService],
