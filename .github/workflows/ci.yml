@@ -254,25 +254,220 @@ jobs:
         with:
           node-version: ${{ env.NODE_VERSION }}
 
-      - name: Collect metrics (inline, no artifact export)
+      - name: Run framework metric tests inline
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GITHUB_REPOSITORY: ${{ github.repository }}
           WORKFLOW_FILE: ci.yml
           METRIC_DAYS: "30"
-          METRIC_OUTPUT_DIR: artifacts/cicd-metrics
-        run: node .github/scripts/collect-cicd-metrics.mjs
+        run: |
+          node <<'NODE'
+          const fs = require('node:fs');
+          const path = require('node:path');
 
-      - name: Run framework metric tests
-        env:
-          METRIC_SUMMARY_FILE: artifacts/cicd-metrics/metrics-summary.json
-          METRIC_TEST_OUTPUT: artifacts/cicd-metrics/metric-test-report.md
-          METRIC_TEST_OUTPUT_JSON: artifacts/cicd-metrics/metric-test-report.json
-          METRIC_TEST_STRICT: "true"
-        run: node .github/scripts/run-metric-tests.mjs
+          const ownerRepo = process.env.GITHUB_REPOSITORY;
+          const token = process.env.GITHUB_TOKEN;
+          const workflowFile = process.env.WORKFLOW_FILE || 'ci.yml';
+          const days = Number(process.env.METRIC_DAYS || '30');
+          const summaryPath = process.env.GITHUB_STEP_SUMMARY;
+
+          if (!ownerRepo) throw new Error('Missing GITHUB_REPOSITORY env');
+          if (!token) throw new Error('Missing GITHUB_TOKEN env');
+          if (!summaryPath) throw new Error('Missing GITHUB_STEP_SUMMARY env');
+
+          const [owner, repo] = ownerRepo.split('/');
+          if (!owner || !repo) throw new Error(`Invalid GITHUB_REPOSITORY: ${ownerRepo}`);
+
+          const headers = {
+            Accept: 'application/vnd.github+json',
+            Authorization: `Bearer ${token}`,
+            'X-GitHub-Api-Version': '2022-11-28',
+          };
+
+          const ghGet = async (url) => {
+            const response = await fetch(url, { headers });
+            if (!response.ok) {
+              throw new Error(`GitHub API error ${response.status} at ${url}\n${await response.text()}`);
+            }
+            return response.json();
+          };
+
+          const parseSeconds = (startedAt, completedAt) => {
+            if (!startedAt || !completedAt) return null;
+            const delta = (new Date(completedAt).getTime() - new Date(startedAt).getTime()) / 1000;
+            return Number.isFinite(delta) && delta >= 0 ? Math.round(delta) : null;
+          };
+
+          const avg = (values) => values.length ? Math.round(values.reduce((sum, value) => sum + value, 0) / values.length) : null;
+          const percentile = (values, p) => {
+            if (!values.length) return null;
+            const sorted = [...values].sort((a, b) => a - b);
+            const index = Math.ceil((p / 100) * sorted.length) - 1;
+            return sorted[Math.max(0, Math.min(sorted.length - 1, index))];
+          };
+
+          const fetchRuns = async () => {
+            const cutoff = Date.now() - days * 24 * 60 * 60 * 1000;
+            const runs = [];
+            let page = 1;
+
+            while (true) {
+              const url = `https://api.github.com/repos/${owner}/${repo}/actions/workflows/${workflowFile}/runs?per_page=100&page=${page}`;
+              const data = await ghGet(url);
+              const pageRuns = data.workflow_runs || [];
+              if (!pageRuns.length) break;
+
+              let stop = false;
+              for (const run of pageRuns) {
+                if (new Date(run.created_at).getTime() < cutoff) {
+                  stop = true;
+                  continue;
+                }
+                runs.push(run);
+              }
+
+              if (stop || pageRuns.length < 100) break;
+              page += 1;
+            }
+
+            return runs;
+          };
+
+          const fetchJobs = async (runId) => {
+            const jobs = [];
+            let page = 1;
+
+            while (true) {
+              const url = `https://api.github.com/repos/${owner}/${repo}/actions/runs/${runId}/jobs?per_page=100&page=${page}`;
+              const data = await ghGet(url);
+              const pageJobs = data.jobs || [];
+              if (!pageJobs.length) break;
+              jobs.push(...pageJobs);
+              if (pageJobs.length < 100) break;
+              page += 1;
+            }
+
+            return jobs;
+          };
+
+          const ciYaml = fs.readFileSync(path.join(process.env.GITHUB_WORKSPACE, '.github', 'workflows', 'ci.yml'), 'utf8');
+          const hasActionlint = /actionlint/.test(ciYaml);
+          const hasSlackFailureNotification = /Notify Slack on Failure/.test(ciYaml);
+          const hasPathFilter = /dorny\/paths-filter@v3/.test(ciYaml);
+          const hasCoverageGate = /--cov-fail-under=80/.test(ciYaml);
+          const hasComplexityHardGate = /--max-complexity=10/.test(ciYaml) && !/--exit-zero/.test(ciYaml);
+          const hardcodedVersionCount = (ciYaml.match(/(node-version|python-version|java-version):\s*["']?\d+(?:\.\d+)?["']?/g) || []).length;
+          const setupNodeUseCount = (ciYaml.match(/actions\/setup-node@v4/g) || []).length;
+          const workflowLines = ciYaml.split('\n').length;
+
+          const runs = await fetchRuns();
+          const runJobs = [];
+          for (const run of runs) {
+            const jobs = await fetchJobs(run.id);
+            runJobs.push({ runId: run.id, jobs });
+          }
+
+          const backendBuildDurations = [];
+          const aiBuildDurations = [];
+          const frontendBuildDurations = [];
+          const leadTimes = [];
+          const deployJobs = [];
+
+          for (const row of runJobs) {
+            const run = runs.find((candidate) => candidate.id === row.runId);
+            if (!run) continue;
+
+            for (const job of row.jobs) {
+              const durationSec = parseSeconds(job.started_at, job.completed_at);
+
+              if (job.name === 'Build Backend (Docker)' && durationSec !== null) backendBuildDurations.push(durationSec);
+              if (job.name === 'Build AI Service (Docker)' && durationSec !== null) aiBuildDurations.push(durationSec);
+              if (job.name === 'Build React Web' && durationSec !== null) frontendBuildDurations.push(durationSec);
+
+              if (job.name === 'Deploy Backend to Render' || job.name === 'Deploy Frontend to Vercel') {
+                deployJobs.push({ run, job });
+                const leadSec = parseSeconds(run.created_at, job.completed_at);
+                if (leadSec !== null) leadTimes.push(leadSec);
+              }
+            }
+          }
+
+          const runSuccessCount = runs.filter((run) => run.conclusion === 'success').length;
+          const rerunSuccessCount = runs.filter((run) => run.run_attempt > 1 && run.conclusion === 'success').length;
+          const deploySuccessCount = deployJobs.filter(({ job }) => job.conclusion === 'success').length;
+          const deployFailureCount = deployJobs.filter(({ job }) => job.conclusion === 'failure').length;
+          const dockerDurations = [...backendBuildDurations, ...aiBuildDurations];
+          const dockerCacheHitProxy = dockerDurations.length
+            ? (dockerDurations.filter((seconds) => seconds < 60).length / dockerDurations.length) * 100
+            : null;
+
+          const checks = [];
+          const push = (id, metric, value, target, status, evidence) => checks.push({ id, metric, value, target, status, evidence });
+          const valueOrNA = (value) => (value === null || value === undefined ? 'N/A' : value);
+
+          const leadP50 = percentile(leadTimes, 50);
+          push('M1.2', 'Lead Time for Changes (p50)', valueOrNA(leadP50), '< 3600s', leadP50 === null ? 'N/A' : (leadP50 < 3600 ? 'PASS' : 'FAIL'), 'Forsgren 2018 Elite threshold');
+
+          const cfr = deploySuccessCount + deployFailureCount > 0
+            ? Number(((deployFailureCount / (deploySuccessCount + deployFailureCount)) * 100).toFixed(2))
+            : null;
+          push('M2.1', 'Change Failure Rate', valueOrNA(cfr), '< 5%', cfr === null ? 'N/A' : (cfr < 5 ? 'PASS' : 'WARN'), 'Forsgren 2018 Elite threshold');
+
+          push('M2.3', 'Test Coverage Gate', valueOrNA(hasCoverageGate), 'Enabled + cov-fail-under >=80', hasCoverageGate ? 'PASS' : 'FAIL', 'Zampetti 2020 testing bad smells');
+          push('M2.4', 'Static Analysis Hard Gate', valueOrNA(hasComplexityHardGate), 'Enabled + no --exit-zero', hasComplexityHardGate ? 'PASS' : 'FAIL', 'Zampetti 2020 build bad smells');
+          push('M2.5', 'Pipeline Config Smell Linter', valueOrNA(hasActionlint), 'Enabled', hasActionlint ? 'PASS' : 'FAIL', 'Vassallo 2020');
+
+          const successRate = runs.length > 0 ? Number(((runSuccessCount / runs.length) * 100).toFixed(2)) : null;
+          push('M3.2', 'Build Success Rate', valueOrNA(successRate), '>= 95%', successRate === null ? 'N/A' : (successRate >= 95 ? 'PASS' : 'FAIL'), 'Zampetti 2020 + Shahin 2018');
+
+          const flakyRate = runs.length > 0 ? Number(((rerunSuccessCount / runs.length) * 100).toFixed(2)) : null;
+          push('M3.3', 'Flaky Job Rate (Proxy)', valueOrNA(flakyRate), '< 2%', flakyRate === null ? 'N/A' : (flakyRate < 2 ? 'PASS' : 'FAIL'), 'Zampetti 2020');
+
+          push('M3.4', 'Failure Notification Readiness', valueOrNA(hasSlackFailureNotification), 'Slack failure notification enabled', hasSlackFailureNotification ? 'PASS' : 'FAIL', 'Shahin 2018 fast feedback');
+
+          push('M4.5', 'Docker Cache Hit Rate (Proxy)', valueOrNA(dockerCacheHitProxy), '>= 70%', dockerCacheHitProxy === null ? 'N/A' : (dockerCacheHitProxy >= 70 ? 'PASS' : 'FAIL'), 'Amor 2022 + Rosa 2025');
+
+          push('M5.1', 'Path-based Change Detection', valueOrNA(hasPathFilter), 'Enabled', hasPathFilter ? 'PASS' : 'FAIL', 'Trase 2018 monorepo selective build');
+          push('M5.4', 'Hardcoded Version String Count', hardcodedVersionCount, '0', hardcodedVersionCount === 0 ? 'PASS' : 'WARN', 'Dipenta 2021 + Vassallo 2020');
+          push('M5.6', 'setup-node repetition count', setupNodeUseCount, 'Track duplication', 'PASS', 'Rahman 2020 + Dipenta 2021');
+          push('M5.6', 'workflow LOC', workflowLines, 'Track size', 'PASS', 'Rahman 2020 + Dipenta 2021');
+
+          const passCount = checks.filter((check) => check.status === 'PASS').length;
+          const failCount = checks.filter((check) => check.status === 'FAIL').length;
+          const warnCount = checks.filter((check) => check.status === 'WARN').length;
+          const naCount = checks.filter((check) => check.status === 'N/A').length;
+
+          const lines = [
+            '# CI/CD Metric Test Report',
+            '',
+            `- Repository: ${ownerRepo}`,
+            `- Workflow: ${workflowFile}`,
+            `- Analysis window: ${days} days`,
+            `- Workflow runs analyzed: ${runs.length}`,
+            `- Deploy jobs analyzed: ${deployJobs.length}`,
+            '',
+            '| Metric ID | Metric | Value | Target | Status | Evidence Source |',
+            '| :--- | :--- | :--- | :--- | :--- | :--- |',
+          ];
+
+          for (const check of checks) {
+            lines.push(`| ${check.id} | ${check.metric} | ${check.value} | ${check.target} | ${check.status} | ${check.evidence} |`);
+          }
+
+          lines.push('', `- PASS: ${passCount}`, `- FAIL: ${failCount}`, `- WARN: ${warnCount}`, `- N/A: ${naCount}`);
+          fs.writeFileSync(summaryPath, `${lines.join('\n')}\n`, 'utf8');
+
+          console.log(`[framework-metric-tests] Fail count: ${failCount}`);
+          console.log(`[framework-metric-tests] Warn count: ${warnCount}`);
+
+          if (failCount > 0) process.exit(1);
+          NODE
 
       - name: Publish framework metric report
-        run: cat artifacts/cicd-metrics/metric-test-report.md >> "$GITHUB_STEP_SUMMARY"
+        if: always()
+        run: |
+          echo "### Framework Metric Tests" >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
 
   deploy-backend:
     name: Deploy Backend to Render
