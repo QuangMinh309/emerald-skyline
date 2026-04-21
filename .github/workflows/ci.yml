@@ -244,6 +244,8 @@ jobs:
     if: github.ref == 'refs/heads/main' && needs.changes.outputs.be == 'true'
     runs-on: ubuntu-latest
     steps:
+      - uses: actions/checkout@v4
+
       - name: Trigger Render Deploy Hook
         id: deploy
         run: curl -fsSL -X GET ${{ secrets.RENDER_BE_DEPLOY_HOOK }}
@@ -269,6 +271,8 @@ jobs:
     if: github.ref == 'refs/heads/main' && needs.changes.outputs.web == 'true'
     runs-on: ubuntu-latest
     steps:
+      - uses: actions/checkout@v4
+      
       - name: Trigger Vercel Deploy Hook
         id: deploy
         run: curl -fsSL -X GET ${{ secrets.VERCEL_DEPLOY_HOOK }}
