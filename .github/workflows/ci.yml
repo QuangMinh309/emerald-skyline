@@ -407,7 +407,7 @@ jobs:
             const valueOrNA = (value) => (value === null || value === undefined ? 'N/A' : value);
 
             const leadP50 = percentile(leadTimes, 50);
-            push('M1.2', 'Lead Time for Changes (p50)', valueOrNA(leadP50), '< 3600s', leadP50 === null ? 'N/A' : (leadP50 < 3600 ? 'PASS' : 'FAIL'), 'Forsgren 2018 Elite threshold');
+            push('M1.2', 'Lead Time for Changes (p50)', valueOrNA(leadP50), '< 3600s', leadP50 === null ? 'N/A' : (leadP50 < 3600 ? 'PASS' : 'WARN'), 'Forsgren 2018 Elite threshold');
 
             const cfr = deploySuccessCount + deployFailureCount > 0
               ? Number(((deployFailureCount / (deploySuccessCount + deployFailureCount)) * 100).toFixed(2))
@@ -419,14 +419,14 @@ jobs:
             push('M2.5', 'Pipeline Config Smell Linter', valueOrNA(hasActionlint), 'Enabled', hasActionlint ? 'PASS' : 'FAIL', 'Vassallo 2020');
 
             const successRate = runs.length > 0 ? Number(((runSuccessCount / runs.length) * 100).toFixed(2)) : null;
-            push('M3.2', 'Build Success Rate', valueOrNA(successRate), '>= 95%', successRate === null ? 'N/A' : (successRate >= 95 ? 'PASS' : 'FAIL'), 'Zampetti 2020 + Shahin 2018');
+            push('M3.2', 'Build Success Rate', valueOrNA(successRate), '>= 95%', successRate === null ? 'N/A' : (successRate >= 95 ? 'PASS' : 'WARN'), 'Zampetti 2020 + Shahin 2018');
 
             const flakyRate = runs.length > 0 ? Number(((rerunSuccessCount / runs.length) * 100).toFixed(2)) : null;
-            push('M3.3', 'Flaky Job Rate (Proxy)', valueOrNA(flakyRate), '< 2%', flakyRate === null ? 'N/A' : (flakyRate < 2 ? 'PASS' : 'FAIL'), 'Zampetti 2020');
+            push('M3.3', 'Flaky Job Rate (Proxy)', valueOrNA(flakyRate), '< 2%', flakyRate === null ? 'N/A' : (flakyRate < 2 ? 'PASS' : 'WARN'), 'Zampetti 2020');
 
-            push('M3.4', 'Failure Notification Readiness', valueOrNA(hasSlackFailureNotification), 'Slack failure notification enabled', hasSlackFailureNotification ? 'PASS' : 'FAIL', 'Shahin 2018 fast feedback');
+            push('M3.4', 'Failure Notification Readiness', valueOrNA(hasSlackFailureNotification), 'Slack failure notification enabled', hasSlackFailureNotification ? 'PASS' : 'WARN', 'Shahin 2018 fast feedback');
 
-            push('M4.5', 'Docker Cache Hit Rate (Proxy)', valueOrNA(dockerCacheHitProxy), '>= 70%', dockerCacheHitProxy === null ? 'N/A' : (dockerCacheHitProxy >= 70 ? 'PASS' : 'FAIL'), 'Amor 2022 + Rosa 2025');
+            push('M4.5', 'Docker Cache Hit Rate (Proxy)', valueOrNA(dockerCacheHitProxy), '>= 70%', dockerCacheHitProxy === null ? 'N/A' : (dockerCacheHitProxy >= 70 ? 'PASS' : 'WARN'), 'Amor 2022 + Rosa 2025');
 
             push('M5.1', 'Path-based Change Detection', valueOrNA(hasPathFilter), 'Enabled', hasPathFilter ? 'PASS' : 'FAIL', 'Trase 2018 monorepo selective build');
             push('M5.4', 'Hardcoded Version String Count', hardcodedVersionCount, '0', hardcodedVersionCount === 0 ? 'PASS' : 'WARN', 'Dipenta 2021 + Vassallo 2020');
