@@ -8,13 +8,17 @@ import getDatabaseConfig from "./configs/database.config";
 import { AccountsModule } from "./modules/accounts/accounts.module";
 import { AiModule } from "./modules/ai/ai.module";
 import { ApartmentsModule } from "./modules/apartments/apartments.module";
+import { AssetTypesModule } from "./modules/asset-types/asset-types.module";
+import { AssetsModule } from "./modules/assets/assets.module";
 import { AuthModule } from "./modules/auth/auth.module";
 import { BlocksModule } from "./modules/blocks/blocks.module";
 import { BookingsModule } from "./modules/bookings/bookings.module";
 import { CloudinaryModule } from "./modules/cloudinary/cloudinary.module";
 import { FeesModule } from "./modules/fees/fees.module";
 import { InvoicesModule } from "./modules/invoices/invoices.module";
+import { IssuesModule } from "./modules/issues/issues.module";
 import { MailerModule } from "./modules/mailer/mailer.module";
+import { MaintenanceTicketsModule } from "./modules/maintenance-tickets/maintenance-tickets.module";
 import { NotificationsModule } from "./modules/notifications/notifications.module";
 import { PaymentsModule } from "./modules/payments/payments.module";
 import { ResidentsModule } from "./modules/residents/residents.module";
@@ -22,6 +26,7 @@ import { ServicesModule } from "./modules/services/services.module";
 import { SocketsModule } from "./modules/sockets/sockets.module";
 import { SupabaseStorageModule } from "./modules/supabase-storage/supabase-storage.module";
 import { SystemNotificationsModule } from "./modules/system-notifications/system-notifications.module";
+import { TechniciansModule } from "./modules/technicians/technicians.module";
 
 @Module({
 	imports: [
@@ -50,6 +55,11 @@ import { SystemNotificationsModule } from "./modules/system-notifications/system
 		SystemNotificationsModule,
 		SocketsModule,
 		NotificationsModule,
+		AssetTypesModule,
+		AssetsModule,
+		MaintenanceTicketsModule,
+		TechniciansModule,
+		IssuesModule,
 	],
 	controllers: [AppController],
 	providers: [AppService],

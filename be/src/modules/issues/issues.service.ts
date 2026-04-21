@@ -1,0 +1,571 @@
+import {
+	BadRequestException,
+	ForbiddenException,
+	HttpException,
+	HttpStatus,
+	Injectable,
+	NotFoundException,
+} from "@nestjs/common";
+import { InjectRepository } from "@nestjs/typeorm";
+import { SystemNotificationType } from "src/modules/system-notifications/entities/system-notification.entity";
+import { In, Repository } from "typeorm";
+import { AccountsService } from "../accounts/accounts.service";
+import { UserRole } from "../accounts/enums/user-role.enum";
+import { Block } from "../blocks/entities/block.entity";
+import { Resident } from "../residents/entities/resident.entity";
+import { SystemNotificationsService } from "../system-notifications/system-notifications.service";
+import { CreateIssueDto } from "./dtos/create-issue.dto";
+import { IssueResponseDto } from "./dtos/issue-response.dto";
+import { QueryIssueDto } from "./dtos/query-issue.dto";
+import { RateIssueDto } from "./dtos/rate-issue.dto";
+import { RejectIssueDto } from "./dtos/reject-issue.dto";
+import { UpdateIssueDto } from "./dtos/update-issue.dto";
+import { UpdateIssueStatusDto } from "./dtos/update-issue-status.dto";
+import { Issue } from "./entities/issue.entity";
+import { IssueStatus, IssueStatusLabels } from "./enums/issue-status.enum";
+import { IssueTypeLabels } from "./enums/issue-type.enum";
+
+@Injectable()
+export class IssuesService {
+	constructor(
+		@InjectRepository(Issue)
+		private readonly issueRepository: Repository<Issue>,
+		@InjectRepository(Resident)
+		private readonly residentRepository: Repository<Resident>,
+		@InjectRepository(Block)
+		private readonly blockRepository: Repository<Block>,
+		private readonly systemNotificationsService: SystemNotificationsService,
+		private readonly accountsService: AccountsService,
+	) {}
+
+	async create(
+		createIssueDto: CreateIssueDto,
+		accountId: number,
+	): Promise<IssueResponseDto> {
+		const resident = await this.residentRepository.findOne({
+			where: { accountId, isActive: true },
+		});
+
+		if (!resident) {
+			throw new HttpException(
+				"Thông tin cư dân không tồn tại hoặc tài khoản bị khóa",
+				HttpStatus.NOT_FOUND,
+			);
+		}
+
+		if (createIssueDto.blockId) {
+			const block = await this.blockRepository.findOne({
+				where: { id: createIssueDto.blockId, isActive: true },
+			});
+
+			if (!block) {
+				throw new HttpException(
+					`Tòa với ID ${createIssueDto.blockId} không tồn tại`,
+					HttpStatus.NOT_FOUND,
+				);
+			}
+
+			if (createIssueDto.floor && createIssueDto.floor > block.totalFloors) {
+				throw new HttpException(
+					`Tầng ${createIssueDto.floor} không tồn tại`,
+					HttpStatus.NOT_FOUND,
+				);
+			}
+		}
+
+		const issue = this.issueRepository.create({
+			reporterId: resident.id,
+			type: createIssueDto.type,
+			title: createIssueDto.title,
+			description: createIssueDto.description,
+			blockId: createIssueDto.blockId,
+			floor: createIssueDto.floor,
+			detailLocation: createIssueDto.detailLocation,
+			fileUrls: createIssueDto.fileUrls || [],
+			status: IssueStatus.PENDING,
+			isUrgent: false,
+			isActive: true,
+		});
+
+		const savedIssue = await this.issueRepository.save(issue);
+		return this.findOne(savedIssue.id);
+	}
+
+	async findAll(
+		query: QueryIssueDto,
+		role: UserRole,
+	): Promise<IssueResponseDto[]> {
+		const { search, status, type, blockId, isUrgent, sortBy, sortOrder } =
+			query;
+
+		const queryBuilder = this.issueRepository
+			.createQueryBuilder("issue")
+			.leftJoinAndSelect("issue.reporter", "reporter")
+			.leftJoinAndSelect("reporter.account", "account")
+			.leftJoinAndSelect("issue.block", "block")
+			.where("issue.isActive = :isActive", { isActive: true });
+
+		// Role-based filtering: Technician only sees assigned issues
+		if (role === UserRole.TECHNICIAN) {
+			queryBuilder.andWhere(
+				"issue.assignedToTechnicianDepartment = :assigned",
+				{
+					assigned: true,
+				},
+			);
+		}
+		// Admin sees all issues (no additional filter needed)
+
+		if (status) {
+			queryBuilder.andWhere("issue.status = :status", { status });
+		}
+
+		if (type) {
+			queryBuilder.andWhere("issue.type = :type", { type });
+		}
+
+		if (blockId) {
+			queryBuilder.andWhere("issue.blockId = :blockId", { blockId });
+		}
+
+		if (isUrgent !== undefined) {
+			queryBuilder.andWhere("issue.isUrgent = :isUrgent", { isUrgent });
+		}
+
+		if (search) {
+			queryBuilder.andWhere(
+				"(issue.title ILIKE :search OR issue.description ILIKE :search)",
+				{ search: `%${search}%` },
+			);
+		}
+
+		// prioritize urgent issues that are not rejected or resolved
+		queryBuilder.orderBy(
+			"CASE WHEN issue.isUrgent = true AND issue.status NOT IN (:rejectedStatus, :resolvedStatus) THEN 0 ELSE 1 END",
+			"ASC",
+		);
+		queryBuilder.setParameters({
+			rejectedStatus: IssueStatus.REJECTED,
+			resolvedStatus: IssueStatus.RESOLVED,
+		});
+
+		const orderBy = sortBy || "createdAt";
+		const order = sortOrder || "DESC";
+		queryBuilder.addOrderBy(`issue.${orderBy}`, order);
+
+		const issues = await queryBuilder.getMany();
+
+		return issues.map((issue) => this.transformToResponse(issue));
+	}
+
+	async findOne(id: number): Promise<IssueResponseDto> {
+		const issue = await this.issueRepository.findOne({
+			where: { id, isActive: true },
+			relations: ["reporter", "reporter.account", "block", "maintenanceTicket"],
+		});
+
+		if (!issue) {
+			throw new HttpException(
+				`Issue với ID ${id} không tồn tại`,
+				HttpStatus.NOT_FOUND,
+			);
+		}
+
+		return this.transformToResponse(issue);
+	}
+
+	async findByResident(residentId: number): Promise<IssueResponseDto[]> {
+		const issues = await this.issueRepository.find({
+			where: { reporterId: residentId, isActive: true },
+			relations: ["reporter", "reporter.account", "block"],
+			order: { createdAt: "DESC" },
+		});
+
+		return issues.map((issue) => this.transformToResponse(issue));
+	}
+
+	async findMyIssues(accountId: number): Promise<IssueResponseDto[]> {
+		const resident = await this.residentRepository.findOne({
+			where: { accountId, isActive: true },
+		});
+
+		if (!resident) {
+			throw new HttpException(
+				"Thông tin cư dân không tồn tại hoặc tài khoản bị khóa",
+				HttpStatus.NOT_FOUND,
+			);
+		}
+
+		return this.findByResident(resident.id);
+	}
+
+	async update(
+		id: number,
+		updateIssueDto: UpdateIssueDto,
+	): Promise<IssueResponseDto> {
+		const issue = await this.issueRepository.findOne({
+			where: { id, isActive: true },
+		});
+
+		if (!issue) {
+			throw new HttpException(
+				`Issue với ID ${id} không tồn tại`,
+				HttpStatus.NOT_FOUND,
+			);
+		}
+
+		if (updateIssueDto.status) {
+			this.validateStatusTransition(issue.status, updateIssueDto.status);
+		}
+
+		Object.assign(issue, updateIssueDto);
+
+		await this.issueRepository.save(issue);
+
+		return this.findOne(id);
+	}
+
+	async rate(
+		id: number,
+		rateIssueDto: RateIssueDto,
+		accountId: number,
+	): Promise<IssueResponseDto> {
+		const resident = await this.residentRepository.findOne({
+			where: { accountId, isActive: true },
+		});
+
+		if (!resident) {
+			throw new HttpException(
+				"Thông tin cư dân không tồn tại hoặc tài khoản bị khóa",
+				HttpStatus.NOT_FOUND,
+			);
+		}
+
+		const issue = await this.issueRepository.findOne({
+			where: { id, isActive: true },
+		});
+
+		if (!issue)
+			throw new NotFoundException(`Phản ánh với ID ${id} không tồn tại`);
+
+		if (issue.reporterId !== resident.id) {
+			throw new ForbiddenException("Bạn không có quyền đánh giá phản ánh này");
+		}
+
+		if (issue.status !== IssueStatus.RESOLVED) {
+			throw new HttpException(
+				"Chỉ có thể đánh giá các vấn đề đã được giải quyết",
+				HttpStatus.BAD_REQUEST,
+			);
+		}
+
+		if (issue.rating) {
+			throw new HttpException(
+				"Phản ánh này đã được đánh giá trước đó",
+				HttpStatus.BAD_REQUEST,
+			);
+		}
+
+		issue.rating = rateIssueDto.rating;
+		issue.feedback = rateIssueDto.feedback || "";
+
+		await this.issueRepository.save(issue);
+
+		return this.findOne(id);
+	}
+
+	async remove(id: number, accountId: number): Promise<{ message: string }> {
+		const resident = await this.residentRepository.findOne({
+			where: { accountId, isActive: true },
+		});
+
+		if (!resident) {
+			throw new HttpException(
+				"Thông tin cư dân không tồn tại hoặc tài khoản bị khóa",
+				HttpStatus.NOT_FOUND,
+			);
+		}
+
+		const issue = await this.issueRepository.findOne({
+			where: { id, isActive: true },
+		});
+
+		if (!issue)
+			throw new NotFoundException(`Phản ánh với ID ${id} không tồn tại`);
+
+		if (issue.reporterId !== resident.id) {
+			throw new ForbiddenException("Bạn không có quyền xóa phản ánh này");
+		}
+
+		if (issue.status !== IssueStatus.PENDING) {
+			throw new BadRequestException(
+				"Chỉ có thể xóa phản ánh khi còn ở trạng thái chờ tiếp nhận",
+			);
+		}
+
+		issue.isActive = false;
+		await this.issueRepository.save(issue);
+
+		return { message: "Xóa phản ánh thành công" };
+	}
+
+	private validateStatusTransition(
+		currentStatus: IssueStatus,
+		newStatus: IssueStatus,
+	): void {
+		const validTransitions: Record<IssueStatus, IssueStatus[]> = {
+			[IssueStatus.PENDING]: [IssueStatus.RECEIVED, IssueStatus.REJECTED],
+			[IssueStatus.RECEIVED]: [
+				IssueStatus.PROCESSING,
+				IssueStatus.PENDING,
+				IssueStatus.REJECTED,
+			],
+			[IssueStatus.PROCESSING]: [IssueStatus.RESOLVED, IssueStatus.RECEIVED],
+			[IssueStatus.RESOLVED]: [],
+			[IssueStatus.REJECTED]: [],
+		};
+
+		const allowedStatuses = validTransitions[currentStatus];
+
+		if (!allowedStatuses.includes(newStatus)) {
+			throw new HttpException(
+				`Không thể chuyển trạng thái từ ${currentStatus} sang ${newStatus}`,
+				HttpStatus.BAD_REQUEST,
+			);
+		}
+	}
+
+	private transformToResponse(issue: Issue): IssueResponseDto {
+		return {
+			id: issue.id,
+			type: issue.type,
+			typeLabel: IssueTypeLabels[issue.type],
+			title: issue.title,
+			description: issue.description,
+			block: issue.block
+				? {
+						id: issue.block.id,
+						name: issue.block.name,
+					}
+				: null,
+			floor: issue.floor,
+			detailLocation: issue.detailLocation,
+			fileUrls: issue.fileUrls,
+			status: issue.status,
+			statusLabel: IssueStatusLabels[issue.status],
+			isUrgent: issue.isUrgent,
+			rating: issue.rating,
+			feedback: issue.feedback,
+			rejectionReason: issue.rejectionReason || null,
+			reporter: issue.reporter
+				? {
+						id: issue.reporter.id,
+						fullName: issue.reporter.fullName,
+						phoneNumber: issue.reporter.phoneNumber,
+					}
+				: null,
+			estimatedCompletionDate: issue.estimatedCompletionDate,
+			maintenanceTicket: issue.maintenanceTicket
+				? {
+						id: issue.maintenanceTicket.id,
+						title: issue.maintenanceTicket.title,
+					}
+				: null,
+			assignedToTechnicianDepartment: issue.assignedToTechnicianDepartment,
+			createdAt: issue.createdAt,
+			updatedAt: issue.updatedAt,
+		};
+	}
+
+	/**
+	 * Reject an issue with reason
+	 * Only PENDING and RECEIVED status can be rejected
+	 */
+	async reject(
+		id: number,
+		rejectIssueDto: RejectIssueDto,
+	): Promise<IssueResponseDto> {
+		const issue = await this.issueRepository.findOne({
+			where: { id, isActive: true },
+		});
+
+		if (!issue) {
+			throw new NotFoundException("Phản ánh không tồn tại");
+		}
+
+		// Only PENDING and RECEIVED can be rejected
+		if (
+			issue.status !== IssueStatus.PENDING &&
+			issue.status !== IssueStatus.RECEIVED
+		) {
+			throw new BadRequestException(
+				`Không thể từ chối phản ánh ở trạng thái ${IssueStatusLabels[issue.status]}. ` +
+					'Chỉ có thể từ chối phản ánh ở trạng thái "Chờ tiếp nhận" hoặc "Đã tiếp nhận".',
+			);
+		}
+
+		// Update issue with rejection status and reason
+		issue.status = IssueStatus.REJECTED;
+		issue.rejectionReason = rejectIssueDto.rejectionReason;
+		issue.updatedAt = new Date();
+
+		const updatedIssue = await this.issueRepository.save(issue);
+		return this.findOne(updatedIssue.id);
+	}
+
+	/**
+	 * Soft delete multiple issues
+	 * Only PENDING status issues can be deleted
+	 */
+	async removeMany(
+		ids: number[],
+	): Promise<{ message: string; deletedCount: number }> {
+		if (!ids || ids.length === 0) {
+			throw new HttpException(
+				"At least one issue ID is required",
+				HttpStatus.BAD_REQUEST,
+			);
+		}
+
+		// Find all PENDING issues with provided IDs
+		const issues = await this.issueRepository.find({
+			where: {
+				id: In(ids),
+				status: IssueStatus.PENDING,
+				isActive: true,
+			},
+		});
+
+		if (issues.length === 0) {
+			throw new HttpException(
+				'Không tìm thấy phản ánh nào ở trạng thái "Chờ tiếp nhận" để xóa',
+				HttpStatus.NOT_FOUND,
+			);
+		}
+
+		// Check if all provided IDs exist as PENDING
+		const foundIds = issues.map((issue) => issue.id);
+		const notFoundIds = ids.filter((id) => !foundIds.includes(id));
+
+		if (notFoundIds.length > 0) {
+			throw new HttpException(
+				`Phản ánh với ID ${notFoundIds.join(", ")} không ở trạng thái "Chờ tiếp nhận" hoặc không tồn tại`,
+				HttpStatus.BAD_REQUEST,
+			);
+		}
+
+		// Soft delete all matching issues
+		await this.issueRepository.update(
+			{ id: In(foundIds) },
+			{ isActive: false, updatedAt: new Date() },
+		);
+
+		return {
+			message: `Xóa ${issues.length} phản ánh thành công`,
+			deletedCount: issues.length,
+		};
+	}
+
+	/**
+	 * Assign issue to technician department
+	 * Any issue with valid status can be assigned to technician department
+	 */
+	async assignToTechnicianDepartment(id: number): Promise<IssueResponseDto> {
+		const issue = await this.issueRepository.findOne({
+			where: { id, isActive: true },
+			relations: ["reporter", "reporter.account", "block"],
+		});
+
+		if (!issue) {
+			throw new HttpException("Phản ánh không tồn tại", HttpStatus.NOT_FOUND);
+		}
+
+		// Validate issue status - cannot assign REJECTED issues
+		if (issue.status === IssueStatus.REJECTED) {
+			throw new HttpException(
+				"Không thể chuyển phản ánh đã bị từ chối cho bộ phận kỹ thuật",
+				HttpStatus.BAD_REQUEST,
+			);
+		}
+
+		if (issue.status === IssueStatus.RESOLVED) {
+			throw new HttpException(
+				"Không thể chuyển phản ánh đã được giải quyết cho bộ phận kỹ thuật",
+				HttpStatus.BAD_REQUEST,
+			);
+		}
+
+		// Auto-promote PENDING to RECEIVED when assigning to technician department
+		if (issue.status === IssueStatus.PENDING) {
+			issue.status = IssueStatus.RECEIVED;
+		}
+
+		// Mark as assigned to technician department
+		issue.assignedToTechnicianDepartment = true;
+		issue.updatedAt = new Date();
+
+		const updatedIssue = await this.issueRepository.save(issue);
+
+		// 🔔 Gửi thông báo realtime cho toàn bộ kỹ thuật viên
+		try {
+			// Lấy danh sách tất cả kỹ thuật viên đang active
+			const technicians = await this.accountsService.findAll({
+				role: UserRole.TECHNICIAN,
+				isActive: true,
+			});
+
+			if (technicians && technicians.length > 0) {
+				const technicianIds = technicians.map((tech) => tech.id);
+
+				// Gửi thông báo
+				await this.systemNotificationsService.sendSystemNotification(
+					{
+						title: "🔧 Phản ánh mới được chuyển đến bộ phận kỹ thuật",
+						content: `Phản ánh "${issue.title}" từ cư dân ${issue.reporter?.fullName || "N/A"} đã được chuyển tiếp. Vui lòng kiểm tra và xử lý.`,
+						type: SystemNotificationType.INFO,
+						metadata: {
+							issueId: updatedIssue.id,
+							issueType: issue.type,
+							issueStatus: issue.status,
+							residentName: issue.reporter?.fullName || "N/A",
+							blockName: issue.block?.name || "N/A",
+						},
+						actionUrl: `/issues/${updatedIssue.id}`,
+						actionText: "Xem chi tiết",
+					},
+					1, // System user ID (admin)
+				);
+			}
+		} catch (error) {
+			// Log lỗi nhưng không ảnh hưởng đến việc chuyển tiếp phản ánh
+			console.error("❌ Lỗi khi gửi thông báo cho kỹ thuật viên:", error);
+		}
+
+		return this.findOne(updatedIssue.id);
+	}
+
+	/**
+	 * Update issue status with validation
+	 */
+	async updateStatus(
+		id: number,
+		updateStatusDto: UpdateIssueStatusDto,
+	): Promise<IssueResponseDto> {
+		const issue = await this.issueRepository.findOne({
+			where: { id, isActive: true },
+		});
+
+		if (!issue) {
+			throw new HttpException("Phản ánh không tồn tại", HttpStatus.NOT_FOUND);
+		}
+
+		// Validate status transition
+		this.validateStatusTransition(issue.status, updateStatusDto.status);
+
+		issue.status = updateStatusDto.status;
+		issue.updatedAt = new Date();
+
+		const updatedIssue = await this.issueRepository.save(issue);
+		return this.findOne(updatedIssue.id);
+	}
+}

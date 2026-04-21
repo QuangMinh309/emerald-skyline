@@ -1,0 +1,540 @@
+/* eslint-disable @typescript-eslint/restrict-template-expressions */
+import {
+	HttpException,
+	HttpStatus,
+	Injectable,
+	Logger,
+	NotFoundException,
+} from "@nestjs/common";
+import { InjectRepository } from "@nestjs/typeorm";
+import { plainToInstance } from "class-transformer";
+import { In, Repository } from "typeorm";
+import { AssetType } from "../asset-types/entities/asset-type.entity";
+import { Block } from "../blocks/entities/block.entity";
+import { TicketHistoryItemDto } from "../maintenance-tickets/dto/ticket-history-item.dto";
+import { MaintenanceTicket } from "../maintenance-tickets/entities/maintenance-ticket.entity";
+import { TicketStatus } from "../maintenance-tickets/enums/ticket-status.enum";
+import { CreateAssetDto } from "./dto/create-asset.dto";
+import { QueryAssetDto } from "./dto/query-asset.dto";
+import { UpdateAssetDto } from "./dto/update-asset.dto";
+import { Asset } from "./entities/asset.entity";
+import { AssetStatus } from "./enums/asset-status.enum";
+
+@Injectable()
+export class AssetsService {
+	private readonly logger = new Logger(AssetsService.name);
+
+	constructor(
+		@InjectRepository(Asset)
+		private readonly assetRepository: Repository<Asset>,
+		@InjectRepository(AssetType)
+		private readonly assetTypeRepository: Repository<AssetType>,
+		@InjectRepository(Block)
+		private readonly blockRepository: Repository<Block>,
+		@InjectRepository(MaintenanceTicket)
+		private readonly ticketRepository: Repository<MaintenanceTicket>,
+	) {}
+
+	async create(createAssetDto: CreateAssetDto) {
+		// Validate asset type exists
+		const assetType = await this.assetTypeRepository.findOne({
+			where: { id: createAssetDto.typeId, isActive: true },
+		});
+
+		if (!assetType) {
+			throw new HttpException(
+				`Asset type với ID ${createAssetDto.typeId} không tồn tại`,
+				HttpStatus.NOT_FOUND,
+			);
+		}
+
+		// Validate block exists
+		const block = await this.blockRepository.findOne({
+			where: { id: createAssetDto.blockId, isActive: true },
+		});
+
+		if (!block) {
+			throw new HttpException(
+				`Block với ID ${createAssetDto.blockId} không tồn tại`,
+				HttpStatus.NOT_FOUND,
+			);
+		}
+
+		// Parse installation date properly
+		let installationDate: Date | undefined;
+		if (createAssetDto.installationDate) {
+			const dateStr = createAssetDto.installationDate;
+
+			// Extract YYYY-MM-DD from ISO string or date string
+			let datePart: string;
+			if (dateStr.includes("T")) {
+				datePart = dateStr.split("T")[0];
+			} else {
+				datePart = dateStr;
+			}
+
+			// Create Date at UTC midnight to preserve the date correctly
+			const [year, month, day] = datePart.split("-").map(Number);
+			installationDate = new Date(Date.UTC(year, month - 1, day));
+		}
+
+		// Calculate warranty expiration date if warrantyYears is provided
+		let warrantyExpirationDate: Date | undefined;
+		if (createAssetDto.warrantyYears && installationDate) {
+			warrantyExpirationDate = new Date(installationDate);
+			warrantyExpirationDate.setFullYear(
+				installationDate.getFullYear() + createAssetDto.warrantyYears,
+			);
+		}
+
+		// Calculate next maintenance date if maintenanceIntervalMonths is provided
+		let nextMaintenanceDate: Date | undefined;
+		if (createAssetDto.maintenanceIntervalMonths && installationDate) {
+			nextMaintenanceDate = new Date(installationDate);
+			nextMaintenanceDate.setMonth(
+				installationDate.getMonth() + createAssetDto.maintenanceIntervalMonths,
+			);
+		} else {
+			nextMaintenanceDate = new Date(installationDate!);
+			nextMaintenanceDate.setMonth(installationDate!.getMonth() + 6);
+		}
+
+		const asset = this.assetRepository.create({
+			name: createAssetDto.name,
+			typeId: createAssetDto.typeId,
+			blockId: createAssetDto.blockId,
+			floor: createAssetDto.floor,
+			locationDetail: createAssetDto.locationDetail,
+			status: createAssetDto.status || AssetStatus.ACTIVE,
+			installationDate,
+			warrantyYears: createAssetDto.warrantyYears,
+			warrantyExpirationDate,
+			maintenanceIntervalMonths: createAssetDto.maintenanceIntervalMonths,
+			nextMaintenanceDate,
+			description: createAssetDto.description,
+			note: createAssetDto.note,
+		});
+
+		const savedAsset = await this.assetRepository.save(asset);
+		return this.findOne(savedAsset.id);
+	}
+
+	async findAll(query: QueryAssetDto) {
+		const { search, blockId, typeId, status, floor } = query;
+
+		const queryBuilder = this.assetRepository
+			.createQueryBuilder("asset")
+			.leftJoinAndSelect("asset.type", "assetType")
+			.leftJoinAndSelect("asset.block", "block")
+			.where("asset.isActive = :isActive", { isActive: true });
+
+		if (search) {
+			queryBuilder.andWhere("asset.name ILIKE :search", {
+				search: `%${search}%`,
+			});
+		}
+
+		if (blockId) {
+			queryBuilder.andWhere("asset.blockId = :blockId", { blockId });
+		}
+
+		if (typeId) {
+			queryBuilder.andWhere("asset.typeId = :typeId", { typeId });
+		}
+
+		if (status) {
+			queryBuilder.andWhere("asset.status = :status", { status });
+		}
+
+		if (floor !== undefined && floor !== null) {
+			queryBuilder.andWhere("asset.floor = :floor", { floor });
+		}
+
+		queryBuilder.orderBy("asset.createdAt", "DESC");
+
+		const assets = await queryBuilder.getMany();
+
+		// Transform to list response format
+		const today = new Date();
+		return assets.map((asset) => {
+			const isWarrantyValid =
+				asset.warrantyExpirationDate &&
+				new Date(asset.warrantyExpirationDate) > today;
+
+			return {
+				id: asset.id,
+				name: asset.name,
+				typeName: asset.type?.name || "N/A",
+				blockName: asset.block?.name || "N/A",
+				floor: asset.floor,
+				locationDetail: asset.locationDetail,
+				status: asset.status,
+				nextMaintenanceDate: asset.nextMaintenanceDate
+					? this.formatDate(asset.nextMaintenanceDate)
+					: null,
+				isWarrantyValid: !!isWarrantyValid,
+			};
+		});
+	}
+
+	async findOne(id: number) {
+		const asset = await this.assetRepository.findOne({
+			where: { id, isActive: true },
+			relations: ["type", "block"],
+		});
+
+		if (!asset) {
+			throw new HttpException(
+				`Asset với ID ${id} không tồn tại`,
+				HttpStatus.NOT_FOUND,
+			);
+		}
+
+		const today = new Date();
+
+		// Calculate warranty validity
+		const isWarrantyValid =
+			asset.warrantyExpirationDate &&
+			new Date(asset.warrantyExpirationDate) > today;
+
+		// Calculate maintenance status
+		const isOverdueMaintenance =
+			asset.nextMaintenanceDate && new Date(asset.nextMaintenanceDate) < today;
+
+		// Calculate days until maintenance
+		let daysUntilMaintenance: number | null = null;
+		if (asset.nextMaintenanceDate) {
+			const nextDate = new Date(asset.nextMaintenanceDate);
+			const diffTime = nextDate.getTime() - today.getTime();
+			daysUntilMaintenance = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+		}
+
+		// Format floor display
+		const floorDisplay = this.getFloorDisplay(asset.floor);
+
+		// Get recent maintenance history
+		const tickets = await this.ticketRepository.find({
+			where: {
+				assetId: id,
+				status: TicketStatus.COMPLETED,
+				isActive: true,
+			},
+			relations: ["technician"],
+			order: {
+				completedDate: "DESC",
+			},
+			take: 10,
+		});
+
+		const recentHistory = tickets.map((ticket) =>
+			plainToInstance(TicketHistoryItemDto, {
+				id: ticket.id,
+				title: ticket.title,
+				type: ticket.type,
+				status: ticket.status,
+				date: ticket.completedDate
+					? ticket.completedDate.toISOString().split("T")[0]
+					: "",
+				result: ticket.result,
+				technicianName: ticket.technician
+					? ticket.technician.fullName
+					: "Chưa có kỹ thuật viên",
+			}),
+		);
+
+		return {
+			id: asset.id,
+			name: asset.name,
+			description: asset.description,
+			note: asset.note,
+			status: asset.status,
+			type: {
+				id: asset.type.id,
+				name: asset.type.name,
+				description: asset.type.description,
+			},
+			location: {
+				blockId: asset.block.id,
+				blockName: asset.block.name,
+				floor: asset.floor,
+				floorDisplay: floorDisplay,
+				detail: asset.locationDetail,
+			},
+			timeline: {
+				installationDate: asset.installationDate
+					? this.formatDate(asset.installationDate)
+					: null,
+				warrantyExpirationDate: asset.warrantyExpirationDate
+					? this.formatDate(asset.warrantyExpirationDate)
+					: null,
+				lastMaintenanceDate: asset.lastMaintenanceDate
+					? this.formatDate(asset.lastMaintenanceDate)
+					: null,
+				nextMaintenanceDate: asset.nextMaintenanceDate
+					? this.formatDate(asset.nextMaintenanceDate)
+					: null,
+				maintenanceIntervalMonths: asset.maintenanceIntervalMonths || 0,
+			},
+			computed: {
+				isWarrantyValid: !!isWarrantyValid,
+				isOverdueMaintenance: !!isOverdueMaintenance,
+				daysUntilMaintenance: daysUntilMaintenance,
+			},
+			recentHistory: recentHistory,
+		};
+	}
+
+	async update(id: number, updateAssetDto: UpdateAssetDto) {
+		const asset = await this.assetRepository.findOne({
+			where: { id, isActive: true },
+		});
+
+		if (!asset) {
+			throw new HttpException(
+				`Asset với ID ${id} không tồn tại`,
+				HttpStatus.NOT_FOUND,
+			);
+		}
+
+		// Validate asset type if being updated
+		if (updateAssetDto.typeId && updateAssetDto.typeId !== asset.typeId) {
+			const assetType = await this.assetTypeRepository.findOne({
+				where: { id: updateAssetDto.typeId, isActive: true },
+			});
+
+			if (!assetType) {
+				throw new HttpException(
+					`Asset type với ID ${updateAssetDto.typeId} không tồn tại`,
+					HttpStatus.NOT_FOUND,
+				);
+			}
+		}
+
+		// Validate block if being updated
+		if (updateAssetDto.blockId && updateAssetDto.blockId !== asset.blockId) {
+			const block = await this.blockRepository.findOne({
+				where: { id: updateAssetDto.blockId, isActive: true },
+			});
+
+			if (!block) {
+				throw new HttpException(
+					`Block với ID ${updateAssetDto.blockId} không tồn tại`,
+					HttpStatus.NOT_FOUND,
+				);
+			}
+		}
+
+		// Calculate warranty expiration date if warrantyYears is provided
+		if (updateAssetDto.warrantyYears !== undefined) {
+			const installDate = updateAssetDto.installationDate
+				? new Date(updateAssetDto.installationDate)
+				: asset.installationDate;
+
+			if (installDate && updateAssetDto.warrantyYears > 0) {
+				const warrantyExpiration = new Date(installDate);
+				warrantyExpiration.setFullYear(
+					installDate.getFullYear() + updateAssetDto.warrantyYears,
+				);
+				asset.warrantyYears = updateAssetDto.warrantyYears;
+				asset.warrantyExpirationDate = warrantyExpiration;
+			} else if (updateAssetDto.warrantyYears === 0) {
+				asset.warrantyYears = 0;
+				asset.warrantyExpirationDate = undefined;
+			}
+		}
+
+		// Update lastMaintenanceDate if provided
+		if (
+			updateAssetDto.lastMaintenanceDate !== undefined &&
+			updateAssetDto.lastMaintenanceDate !== null
+		) {
+			asset.lastMaintenanceDate = new Date(updateAssetDto.lastMaintenanceDate);
+		}
+
+		// Calculate next maintenance date if maintenanceIntervalMonths is provided or lastMaintenanceDate is updated
+		// Use stored maintenanceIntervalMonths if available, or calculate from new/existing values
+		if (
+			updateAssetDto.maintenanceIntervalMonths !== undefined ||
+			(updateAssetDto.lastMaintenanceDate !== undefined &&
+				updateAssetDto.lastMaintenanceDate !== null)
+		) {
+			// Determine interval to use
+			const interval =
+				updateAssetDto.maintenanceIntervalMonths !== undefined
+					? updateAssetDto.maintenanceIntervalMonths
+					: asset.maintenanceIntervalMonths;
+
+			// Determine base date for calculation (prefer updated lastMaintenanceDate)
+			const baseDate =
+				(updateAssetDto.lastMaintenanceDate !== undefined &&
+				updateAssetDto.lastMaintenanceDate !== null
+					? new Date(updateAssetDto.lastMaintenanceDate)
+					: asset.lastMaintenanceDate) ||
+				(updateAssetDto.installationDate
+					? new Date(updateAssetDto.installationDate)
+					: asset.installationDate);
+
+			// Calculate next maintenance date
+			if (baseDate && interval && interval > 0) {
+				const nextMaintenance = new Date(baseDate);
+				nextMaintenance.setMonth(nextMaintenance.getMonth() + interval);
+				asset.maintenanceIntervalMonths = interval;
+				asset.nextMaintenanceDate = nextMaintenance;
+			} else if (interval === 0) {
+				asset.maintenanceIntervalMonths = 0;
+				asset.nextMaintenanceDate = undefined;
+			}
+		}
+
+		// Update other fields
+		if (updateAssetDto.name !== undefined) asset.name = updateAssetDto.name;
+		if (updateAssetDto.typeId !== undefined)
+			asset.typeId = updateAssetDto.typeId;
+		if (updateAssetDto.blockId !== undefined)
+			asset.blockId = updateAssetDto.blockId;
+		if (updateAssetDto.floor !== undefined) asset.floor = updateAssetDto.floor;
+		if (updateAssetDto.locationDetail !== undefined)
+			asset.locationDetail = updateAssetDto.locationDetail;
+		if (updateAssetDto.status !== undefined)
+			asset.status = updateAssetDto.status;
+		if (updateAssetDto.installationDate !== undefined)
+			asset.installationDate = new Date(updateAssetDto.installationDate);
+		if (updateAssetDto.description !== undefined)
+			asset.description = updateAssetDto.description;
+		if (updateAssetDto.note !== undefined) asset.note = updateAssetDto.note;
+
+		await this.assetRepository.save(asset);
+
+		return this.findOne(id);
+	}
+
+	async remove(id: number) {
+		const asset = await this.assetRepository.findOne({
+			where: { id, isActive: true },
+		});
+
+		if (!asset) {
+			throw new HttpException(
+				`Asset với ID ${id} không tồn tại`,
+				HttpStatus.NOT_FOUND,
+			);
+		}
+
+		// Check if asset has active maintenance tickets
+		const activeTicketsCount = await this.ticketRepository.count({
+			where: {
+				assetId: id,
+				status: In([TicketStatus.PENDING, TicketStatus.IN_PROGRESS]),
+				isActive: true,
+			},
+		});
+
+		if (activeTicketsCount > 0) {
+			throw new HttpException(
+				`Không thể xóa tài sản đang có ${activeTicketsCount} tickets đang xử lý`,
+				HttpStatus.BAD_REQUEST,
+			);
+		}
+
+		// Soft delete
+		asset.isActive = false;
+		await this.assetRepository.save(asset);
+
+		return { message: "Xóa tài sản thành công" };
+	}
+
+	async removeMany(ids: number[]) {
+		const assets = await this.assetRepository.find({
+			where: { id: In(ids), isActive: true },
+		});
+
+		if (assets.length === 0) {
+			throw new HttpException(
+				"Không tìm thấy tài sản nào với các ID đã cung cấp",
+				HttpStatus.NOT_FOUND,
+			);
+		}
+
+		// Check if any of these assets have active maintenance tickets
+		const activeTicketsCount = await this.ticketRepository.count({
+			where: {
+				assetId: In(ids),
+				status: In([TicketStatus.PENDING, TicketStatus.IN_PROGRESS]),
+				isActive: true,
+			},
+		});
+
+		if (activeTicketsCount > 0) {
+			throw new HttpException(
+				`Không thể xóa các tài sản đang có ${activeTicketsCount} tickets đang xử lý`,
+				HttpStatus.BAD_REQUEST,
+			);
+		}
+
+		// Soft delete all
+		await this.assetRepository.update({ id: In(ids) }, { isActive: false });
+
+		return {
+			message: `Đã xóa thành công ${assets.length} tài sản`,
+			deletedCount: assets.length,
+		};
+	}
+
+	private formatDate(date: Date | string): string {
+		// Debug log
+		this.logger.debug(
+			`formatDate input: ${date}, type: ${typeof date}, constructor: ${date?.constructor?.name}`,
+		);
+
+		let dateObj: Date;
+
+		if (date instanceof Date) {
+			// Already a Date object - use as is
+			dateObj = date;
+			this.logger.debug(`Date object detected, ISO: ${dateObj.toISOString()}`);
+		} else if (typeof date === "string") {
+			// If it's a UTC ISO string (e.g., "2026-01-20T00:00:00.000Z"), parse it correctly
+			if (date.includes("T")) {
+				// UTC timestamp - extract just the date part before 'T'
+				const datePart = date.split("T")[0];
+				const [year, month, day] = datePart.split("-").map(Number);
+				dateObj = new Date(Date.UTC(year, month - 1, day));
+				this.logger.debug(
+					`ISO string parsed, created UTC date: ${dateObj.toISOString()}`,
+				);
+			} else {
+				// Already just YYYY-MM-DD
+				const [year, month, day] = date.split("-").map(Number);
+				dateObj = new Date(Date.UTC(year, month - 1, day));
+				this.logger.debug(
+					`Date string parsed, created UTC date: ${dateObj.toISOString()}`,
+				);
+			}
+		} else {
+			// Fallback
+			dateObj = new Date(date);
+			this.logger.debug(`Fallback parsing, result: ${dateObj.toISOString()}`);
+		}
+
+		// Always use UTC getters since database stores UTC dates
+		const year = dateObj.getUTCFullYear();
+		const month = String(dateObj.getUTCMonth() + 1).padStart(2, "0");
+		const day = String(dateObj.getUTCDate()).padStart(2, "0");
+		const result = `${year}-${month}-${day}`;
+
+		this.logger.debug(
+			`formatDate output: ${result}, using UTC getters (year=${year}, month=${month}, day=${day})`,
+		);
+		return result;
+	}
+
+	private getFloorDisplay(floor: number): string {
+		if (floor === 0) {
+			return "Tầng trệt";
+		} else if (floor > 0) {
+			return `Tầng ${floor}`;
+		} else {
+			return `Hầm B${Math.abs(floor)}`;
+		}
+	}
+}
