@@ -15,10 +15,13 @@ import { CloudinaryModule } from "./modules/cloudinary/cloudinary.module";
 import { FeesModule } from "./modules/fees/fees.module";
 import { InvoicesModule } from "./modules/invoices/invoices.module";
 import { MailerModule } from "./modules/mailer/mailer.module";
+import { NotificationsModule } from "./modules/notifications/notifications.module";
 import { PaymentsModule } from "./modules/payments/payments.module";
 import { ResidentsModule } from "./modules/residents/residents.module";
 import { ServicesModule } from "./modules/services/services.module";
+import { SocketsModule } from "./modules/sockets/sockets.module";
 import { SupabaseStorageModule } from "./modules/supabase-storage/supabase-storage.module";
+import { SystemNotificationsModule } from "./modules/system-notifications/system-notifications.module";
 
 @Module({
 	imports: [
@@ -44,6 +47,9 @@ import { SupabaseStorageModule } from "./modules/supabase-storage/supabase-stora
 		PaymentsModule,
 		FeesModule,
 		AiModule,
+		SystemNotificationsModule,
+		SocketsModule,
+		NotificationsModule,
 	],
 	controllers: [AppController],
 	providers: [AppService],
