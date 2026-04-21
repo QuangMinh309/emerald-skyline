@@ -27,6 +27,7 @@ import { SocketsModule } from "./modules/sockets/sockets.module";
 import { SupabaseStorageModule } from "./modules/supabase-storage/supabase-storage.module";
 import { SystemNotificationsModule } from "./modules/system-notifications/system-notifications.module";
 import { TechniciansModule } from "./modules/technicians/technicians.module";
+import { VotingsModule } from "./modules/votings/votings.module";
 
 @Module({
 	imports: [
@@ -60,6 +61,7 @@ import { TechniciansModule } from "./modules/technicians/technicians.module";
 		MaintenanceTicketsModule,
 		TechniciansModule,
 		IssuesModule,
+		VotingsModule,
 	],
 	controllers: [AppController],
 	providers: [AppService],
