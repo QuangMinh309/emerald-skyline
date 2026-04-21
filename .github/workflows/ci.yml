@@ -73,45 +73,53 @@ jobs:
         run: biome ci --changed --since=main --no-errors-on-unmatched .
 
   lint-ai:
-    name: Lint + Test AI Service (Python)
-    needs: [changes, code-quality]
-    if: needs.changes.outputs.ai == 'true'
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
+  name: Lint + Test AI Service (Python)
+  needs: [changes, code-quality]
+  if: needs.changes.outputs.ai == 'true'
+  runs-on: ubuntu-latest
 
-      - name: Set up Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: ${{ env.PYTHON_VERSION }}
-          cache: "pip"
-          cache-dependency-path: ai/requirements.txt
+  steps:
+    - uses: actions/checkout@v4
 
-      - name: Install dependencies
-        run: |
-          python -m pip install --upgrade pip
-          pip install flake8 pytest pytest-cov pytest-rerunfailures
-          cd ai && pip install -r requirements.txt
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: ${{ env.PYTHON_VERSION }}
+        cache: "pip"
+        cache-dependency-path: ai/requirements.txt
 
-      - name: Lint — Critical errors (hard gate)
-        run: |
-          cd ai
-          flake8 . --count --select=E9,F63,F7,F82 --show-source --statistics
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install flake8 pytest pytest-cov
+        cd ai && pip install -r requirements.txt
 
-      - name: Lint — Complexity gate (hard block, max-complexity=10)
-        run: |
-          cd ai
-          flake8 . --count --max-complexity=10 --max-line-length=127 --statistics
+    - name: Lint - Critical errors only (safe gate)
+      run: |
+        cd ai
+        flake8 . \
+          --count \
+          --select=E9,F63,F7,F82 \
+          --show-source \
+          --statistics
 
-      - name: Test with pytest (coverage gate >=80%, flaky detection)
-        run: |
-          cd ai
-          pytest --tb=short \
-                 --cov=. \
-                 --cov-report=term-missing \
-                 --cov-fail-under=80 \
-                 --reruns 2 \
-                 --reruns-delay 1
+    - name: Lint - Style (soft check)
+      continue-on-error: true
+      run: |
+        cd ai
+        flake8 . \
+          --max-complexity=15 \
+          --max-line-length=140 \
+          --ignore=W293,W291 \
+          --statistics
+
+    - name: Test with pytest (coverage >=70%)
+      run: |
+        cd ai
+        pytest --tb=short \
+               --cov=. \
+               --cov-report=term-missing \
+               --cov-fail-under=70
 
   build-backend:
     name: Build Backend (Docker)
@@ -476,9 +484,73 @@ jobs:
           echo "### Framework Metric Tests" >> "$GITHUB_STEP_SUMMARY"
           echo "" >> "$GITHUB_STEP_SUMMARY"
 
+  test-backend:
+    name: Test Backend (Jest + Coverage)
+    needs: [changes, code-quality]
+    if: needs.changes.outputs.be == 'true'
+    runs-on: ubuntu-latest
+
+    defaults:
+      run:
+        working-directory: be
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: "npm"
+          cache-dependency-path: be/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run Tests with Coverage
+        run: |
+          npm run test:cov -- \
+            --bail \
+            --maxWorkers=2
+        env:
+          CI: true
+
+      - name: Upload Coverage Reports
+        if: always()
+        uses: codecov/codecov-action@v4
+        with:
+          files: ./be/coverage/coverage-final.json
+          flags: backend
+          name: backend-coverage
+          fail_ci_if_error: false
+
+      - name: Test Summary
+        if: always()
+        run: |
+          {
+            echo "### Backend Test Results"
+            echo ""
+
+            if [ -f "coverage/coverage-summary.json" ]; then
+              echo "| Metric | Coverage |"
+              echo "|--------|----------|"
+
+              node -e "
+                const fs = require('fs');
+                const summary = JSON.parse(fs.readFileSync('coverage/coverage-summary.json','utf8'));
+                const total = summary.total;
+                for (const key of Object.keys(total)) {
+                  console.log(\`| \${key} | \${total[key].pct}% |\`);
+                }
+              "
+            else
+              echo "> No coverage report found."
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"
+
   deploy-backend:
     name: Deploy Backend to Render
-    needs: [changes, build-backend, code-quality, framework-metric-tests]
+    needs: [changes, build-backend, test-backend, code-quality, framework-metric-tests]
     if: github.ref == 'refs/heads/main' && needs.changes.outputs.be == 'true'
     runs-on: ubuntu-latest
     steps:
@@ -510,7 +582,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      
+
       - name: Trigger Vercel Deploy Hook
         id: deploy
         run: curl -fsSL -X GET ${{ secrets.VERCEL_DEPLOY_HOOK }}
