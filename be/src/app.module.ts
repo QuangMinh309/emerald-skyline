@@ -8,6 +8,8 @@ import getDatabaseConfig from "./configs/database.config";
 import { AccountsModule } from "./modules/accounts/accounts.module";
 import { AiModule } from "./modules/ai/ai.module";
 import { ApartmentsModule } from "./modules/apartments/apartments.module";
+import { AssetTypesModule } from "./modules/asset-types/asset-types.module";
+import { AssetsModule } from "./modules/assets/assets.module";
 import { AuthModule } from "./modules/auth/auth.module";
 import { BlocksModule } from "./modules/blocks/blocks.module";
 import { BookingsModule } from "./modules/bookings/bookings.module";
@@ -50,6 +52,8 @@ import { SystemNotificationsModule } from "./modules/system-notifications/system
 		SystemNotificationsModule,
 		SocketsModule,
 		NotificationsModule,
+		AssetTypesModule,
+		AssetsModule,
 	],
 	controllers: [AppController],
 	providers: [AppService],
