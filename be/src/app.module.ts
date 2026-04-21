@@ -21,6 +21,7 @@ import { MailerModule } from "./modules/mailer/mailer.module";
 import { MaintenanceTicketsModule } from "./modules/maintenance-tickets/maintenance-tickets.module";
 import { NotificationsModule } from "./modules/notifications/notifications.module";
 import { PaymentsModule } from "./modules/payments/payments.module";
+import { ReportsModule } from "./modules/reports/reports.module";
 import { ResidentsModule } from "./modules/residents/residents.module";
 import { ServicesModule } from "./modules/services/services.module";
 import { SocketsModule } from "./modules/sockets/sockets.module";
@@ -62,6 +63,7 @@ import { VotingsModule } from "./modules/votings/votings.module";
 		TechniciansModule,
 		IssuesModule,
 		VotingsModule,
+		ReportsModule,
 	],
 	controllers: [AppController],
 	providers: [AppService],
