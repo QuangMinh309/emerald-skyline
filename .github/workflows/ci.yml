@@ -238,6 +238,42 @@ jobs:
               | awk '{print "| " $2 " | " $1 " |"}'
           } >> "$GITHUB_STEP_SUMMARY"
 
+  framework-metric-tests:
+    name: Framework Metric Tests (Inline)
+    needs: [changes, code-quality]
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      actions: read
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      - name: Collect metrics (inline, no artifact export)
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+          WORKFLOW_FILE: ci.yml
+          METRIC_DAYS: "30"
+          METRIC_OUTPUT_DIR: artifacts/cicd-metrics
+        run: node .github/scripts/collect-cicd-metrics.mjs
+
+      - name: Run framework metric tests
+        env:
+          METRIC_SUMMARY_FILE: artifacts/cicd-metrics/metrics-summary.json
+          METRIC_TEST_OUTPUT: artifacts/cicd-metrics/metric-test-report.md
+          METRIC_TEST_OUTPUT_JSON: artifacts/cicd-metrics/metric-test-report.json
+          METRIC_TEST_STRICT: "true"
+        run: node .github/scripts/run-metric-tests.mjs
+
+      - name: Publish framework metric report
+        run: cat artifacts/cicd-metrics/metric-test-report.md >> "$GITHUB_STEP_SUMMARY"
+
   test-backend:
     name: Test Backend (Jest + Coverage)
     needs: [changes, code-quality]
@@ -304,7 +340,7 @@ jobs:
 
   deploy-backend:
     name: Deploy Backend to Render
-    needs: [changes, build-backend, test-backend, code-quality]
+    needs: [changes, build-backend, test-backend, code-quality, framework-metric-tests]
     if: github.ref == 'refs/heads/main' && needs.changes.outputs.be == 'true'
     runs-on: ubuntu-latest
     steps:
@@ -331,7 +367,7 @@ jobs:
 
   deploy-frontend:
     name: Deploy Frontend to Vercel
-    needs: [changes, build-frontend, code-quality]
+    needs: [changes, build-frontend, code-quality, framework-metric-tests]
     if: github.ref == 'refs/heads/main' && needs.changes.outputs.web == 'true'
     runs-on: ubuntu-latest
     steps:
