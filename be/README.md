@@ -23,76 +23,180 @@
 
 ## Description
 
-[Nest](https://github.com/nestjs/nest) framework TypeScript starter repository.
+Emerald Skyline Backend API - Hệ thống quản lý chung cư hiện đại xây dựng bằng [NestJS](https://github.com/nestjs/nest), TypeORM và PostgreSQL.
 
-## Project setup
+### 📋 Các module chính:
 
-```bash
-$ npm install
-```
+- **Accounts**: Quản lý tài khoản người dùng
+- **Apartments**: Quản lý căn hộ và cư dân
+- **Invoices**: Quản lý hóa đơn tiền phí quản lý
+- **Payments**: Xử lý thanh toán (MoMo, VNPay)
+- **Maintenance Tickets**: Quản lý vé bảo trì
+- **Notifications**: Hệ thống thông báo realtime
+- **Reports**: Báo cáo thống kê
+- **AI Service**: Tích hợp OCR cho đọc số điện nước
 
-## Compile and run the project
+---
 
-```bash
-# development
-$ npm run start
+## 🚀 Quick Start
 
-# watch mode
-$ npm run start:dev
-
-# production mode
-$ npm run start:prod
-```
-
-## Run tests
+### 1️⃣ Cài đặt dependencies
 
 ```bash
-# unit tests
-$ npm run test
-
-# e2e tests
-$ npm run test:e2e
-
-# test coverage
-$ npm run test:cov
+# Cài đặt npm packages
+npm install
 ```
 
-## Deployment
-
-When you're ready to deploy your NestJS application to production, there are some key steps you can take to ensure it runs as efficiently as possible. Check out the [deployment documentation](https://docs.nestjs.com/deployment) for more information.
-
-If you are looking for a cloud-based platform to deploy your NestJS application, check out [Mau](https://mau.nestjs.com), our official platform for deploying NestJS applications on AWS. Mau makes deployment straightforward and fast, requiring just a few simple steps:
+### 2️⃣ Cấu hình environment
 
 ```bash
-$ npm install -g @nestjs/mau
-$ mau deploy
+# Copy file .env.example thành .env (nếu chưa có)
+cp .env.example .env
+
+# Chỉnh sửa .env với credentials
+# - DATABASE_URL: PostgreSQL connection string
+# - JWT_SECRET: Secret key cho JWT tokens
+# - CLOUDINARY_*: Cloudinary API credentials
+# - SMTP_*: Email service credentials
+# - MOMO_*, VNPAY_*: Payment gateway credentials
 ```
 
-With Mau, you can deploy your application in just a few clicks, allowing you to focus on building features rather than managing infrastructure.
+### 3️⃣ Chuẩn bị Database
 
-## Resources
+```bash
+# Chạy migrations để tạo schema
+npm run m:run
 
-Check out a few resources that may come in handy when working with NestJS:
+# Hoặc từng bước:
+npm run typeorm migration:run    # Chạy tất cả migrations
+npm run typeorm migration:revert # Hoàn tác migration gần nhất
+```
 
-- Visit the [NestJS Documentation](https://docs.nestjs.com) to learn more about the framework.
-- For questions and support, please visit our [Discord channel](https://discord.gg/G7Qnnhy).
-- To dive deeper and get more hands-on experience, check out our official video [courses](https://courses.nestjs.com/).
-- Deploy your application to AWS with the help of [NestJS Mau](https://mau.nestjs.com) in just a few clicks.
-- Visualize your application graph and interact with the NestJS application in real-time using [NestJS Devtools](https://devtools.nestjs.com).
-- Need help with your project (part-time to full-time)? Check out our official [enterprise support](https://enterprise.nestjs.com).
-- To stay in the loop and get updates, follow us on [X](https://x.com/nestframework) and [LinkedIn](https://linkedin.com/company/nestjs).
-- Looking for a job, or have a job to offer? Check out our official [Jobs board](https://jobs.nestjs.com).
+### 4️⃣ Chạy ứng dụng
 
-## Support
+```bash
+# Development mode (auto reload khi code thay đổi)
+npm run start:dev
 
-Nest is an MIT-licensed open source project. It can grow thanks to the sponsors and support by the amazing backers. If you'd like to join them, please [read more here](https://docs.nestjs.com/support).
+# Production mode
+npm run start:prod
 
-## Stay in touch
+# Debug mode (attach debugger)
+npm run start:debug
+```
 
-- Author - [Kamil Myśliwiec](https://twitter.com/kammysliwiec)
-- Website - [https://nestjs.com](https://nestjs.com/)
-- Twitter - [@nestframework](https://twitter.com/nestframework)
+ứng dụng sẽ chạy tại: `http://localhost:4000`
+
+---
+
+## 🧪 Testing
+
+### Chạy tests
+
+```bash
+# Chạy tất cả unit tests
+npm run test
+
+# Chạy test ở chế độ watch (tự động rerun khi code thay đổi)
+npm run test:watch
+
+# Chạy test với coverage report
+npm run test:cov
+
+# Debug test (attach debugger)
+npm run test:debug
+
+# Chạy end-to-end tests
+npm run test:e2e
+```
+
+---
+
+## 📚 Database Migrations
+
+### Các lệnh migration
+
+```bash
+# Chạy tất cả pending migrations
+npm run m:run
+
+# Hoàn tác migration gần nhất
+npm run m:revert
+
+# Tạo migration mới từ thay đổi entity
+npm run m:gen src/migrations/<MigrationName>
+
+# Tạo migration rỗng (viết manual)
+npm run m:create src/migrations/<MigrationName>
+
+# TypeORM CLI trực tiếp
+npm run typeorm -- <command>
+```
+
+---
+
+## 🔨 Available Scripts
+
+```bash
+# Build
+npm run build                 # Compile TypeScript
+
+# Start
+npm run start                 # Node production
+npm run start:dev            # Watch mode
+npm run start:debug          # Debug mode
+
+# Database
+npm run typeorm              # TypeORM CLI
+npm run m:gen                # Generate migration
+npm run m:create             # Create migration file
+npm run m:run                # Run migrations
+npm run m:revert             # Revert last migration
+
+# Testing
+npm run test                 # Jest unit tests
+npm run test:watch          # Jest watch mode
+npm run test:cov            # Coverage report
+npm run test:debug          # Debug tests
+npm run test:e2e            # E2E tests
+
+# Code quality
+npm run format              # Prettier format
+```
+
+---
+
+## 📖 API Documentation
+
+Swagger API docs available at: `https://emerald-skyline-beee.onrender.com/api/v1/docs`
+
+---
+
+## 📦 Deployment
+
+### Docker
+
+```bash
+# Build Docker image
+docker build -t emerald-be:latest .
+
+# Run container
+docker run -p 3000:3000 \
+  --env-file .env \
+  emerald-be:latest
+```
+
+---
+
+## 📚 Resources
+
+- [NestJS Documentation](https://docs.nestjs.com)
+- [TypeORM Documentation](https://typeorm.io)
+- [Passport.js](https://www.passportjs.org)
+- [Swagger/OpenAPI](https://swagger.io)
+
+---
 
 ## License
 
-Nest is [MIT licensed](https://github.com/nestjs/nest/blob/master/LICENSE).
+UNLICENSED - Private project
