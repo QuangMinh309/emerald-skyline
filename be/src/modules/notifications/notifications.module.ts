@@ -1,0 +1,37 @@
+import { Module } from "@nestjs/common";
+import { TypeOrmModule } from "@nestjs/typeorm";
+import { Account } from "../accounts/entities/account.entity";
+import { Apartment } from "../apartments/entities/apartment.entity";
+import { ApartmentResident } from "../apartments/entities/apartment-resident.entity";
+import { Block } from "../blocks/entities/block.entity";
+import { CloudinaryModule } from "../cloudinary/cloudinary.module";
+import { MailerModule } from "../mailer/mailer.module";
+import { Resident } from "../residents/entities/resident.entity";
+import { SupabaseStorageModule } from "../supabase-storage/supabase-storage.module";
+import { Notification } from "./entities/notification.entity";
+import { TargetBlock } from "./entities/target-block.entity";
+import { UserNotification } from "./entities/user-notification.entity";
+import { NotificationsController } from "./notifications.controller";
+import { NotificationsService } from "./notifications.service";
+
+@Module({
+	imports: [
+		TypeOrmModule.forFeature([
+			Notification,
+			TargetBlock,
+			Block,
+			UserNotification,
+			Resident,
+			ApartmentResident,
+			Account,
+			Apartment,
+		]),
+		CloudinaryModule,
+		SupabaseStorageModule,
+		MailerModule,
+	],
+	controllers: [NotificationsController],
+	providers: [NotificationsService],
+	exports: [NotificationsService],
+})
+export class NotificationsModule {}
