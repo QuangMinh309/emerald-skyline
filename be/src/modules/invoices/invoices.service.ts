@@ -3,7 +3,7 @@
 import { HttpException, HttpStatus, Injectable } from "@nestjs/common";
 import { Cron, CronExpression } from "@nestjs/schedule";
 import { InjectRepository } from "@nestjs/typeorm";
-// import { SystemNotificationType } from "src/modules/system-notifications/entities/system-notification.entity";
+import { SystemNotificationType } from "src/modules/system-notifications/entities/system-notification.entity";
 import { Between, In, Repository } from "typeorm";
 import { Apartment } from "../apartments/entities/apartment.entity";
 import { ApartmentResident } from "../apartments/entities/apartment-resident.entity";
@@ -12,7 +12,7 @@ import { Fee } from "../fees/entities/fee.entity";
 import { FeeTier } from "../fees/entities/fee-tier.entity";
 import { FeeType } from "../fees/enums/fee-type.enum";
 import { Resident } from "../residents/entities/resident.entity";
-// import { SystemNotificationsService } from "../system-notifications/system-notifications.service";
+import { SystemNotificationsService } from "../system-notifications/system-notifications.service";
 import { CreateInvoiceAdminDto } from "./dto/create-invoice-admin.dto";
 import { CreateInvoiceClientDto } from "./dto/create-invoice-client.dto";
 import { QueryInvoiceDto } from "./dto/query-invoice.dto";
@@ -51,7 +51,7 @@ export class InvoicesService {
 		@InjectRepository(ApartmentResident)
 		private apartmentResidentRepository: Repository<ApartmentResident>,
 		private cloudinaryService: CloudinaryService,
-		// private systemNotificationsService: SystemNotificationsService,
+		private systemNotificationsService: SystemNotificationsService,
 	) {}
 
 	/**
@@ -144,7 +144,9 @@ export class InvoicesService {
 		return undefined;
 	}
 
-	private async uploadProofImages(files?: Express.Multer.File[]): Promise<string | undefined> {
+	private async uploadProofImages(
+		files?: Express.Multer.File[],
+	): Promise<string | undefined> {
 		if (!files?.length) {
 			return undefined;
 		}
@@ -159,10 +161,13 @@ export class InvoicesService {
 					uploadedImageUrls.push(uploadedUrl);
 				}
 			} catch (error) {
-				console.error("[Invoice][Client] Upload image failed, continue without this image:", {
-					fileName: file.originalname,
-					error: error instanceof Error ? error.message : error,
-				});
+				console.error(
+					"[Invoice][Client] Upload image failed, continue without this image:",
+					{
+						fileName: file.originalname,
+						error: error instanceof Error ? error.message : error,
+					},
+				);
 			}
 		}
 
@@ -1488,101 +1493,101 @@ export class InvoicesService {
 	 * Chạy hàng ngày lúc 09:00 sáng
 	 * Logic: Tìm các hóa đơn có dueDate = ngày mai AND status = UNPAID → Gửi thông báo
 	 */
-	// @Cron(CronExpression.EVERY_DAY_AT_9AM)
-	// async sendPaymentReminderNotifications(): Promise<void> {
-	// 	const today = new Date();
-	// 	today.setHours(0, 0, 0, 0);
+	@Cron(CronExpression.EVERY_DAY_AT_9AM)
+	async sendPaymentReminderNotifications(): Promise<void> {
+		const today = new Date();
+		today.setHours(0, 0, 0, 0);
 
-	// 	// Tính ngày mai (1 ngày trước khi hết hạn)
-	// 	const tomorrow = new Date(today);
-	// 	tomorrow.setDate(tomorrow.getDate() + 1);
+		// Tính ngày mai (1 ngày trước khi hết hạn)
+		const tomorrow = new Date(today);
+		tomorrow.setDate(tomorrow.getDate() + 1);
 
-	// 	// Ngày kết thúc của ngày mai
-	// 	const tomorrowEnd = new Date(tomorrow);
-	// 	tomorrowEnd.setHours(23, 59, 59, 999);
+		// Ngày kết thúc của ngày mai
+		const tomorrowEnd = new Date(tomorrow);
+		tomorrowEnd.setHours(23, 59, 59, 999);
 
-	// 	try {
-	// 		// Tìm tất cả hóa đơn UNPAID có dueDate = ngày mai
-	// 		const upcomingDueInvoices = await this.invoiceRepository.find({
-	// 			where: {
-	// 				status: InvoiceStatus.UNPAID,
-	// 				dueDate: Between(tomorrow, tomorrowEnd),
-	// 				isActive: true,
-	// 			},
-	// 			relations: ["apartment"],
-	// 		});
+		try {
+			// Tìm tất cả hóa đơn UNPAID có dueDate = ngày mai
+			const upcomingDueInvoices = await this.invoiceRepository.find({
+				where: {
+					status: InvoiceStatus.UNPAID,
+					dueDate: Between(tomorrow, tomorrowEnd),
+					isActive: true,
+				},
+				relations: ["apartment"],
+			});
 
-	// 		if (upcomingDueInvoices.length === 0) {
-	// 			console.log("No invoices due tomorrow that need payment reminders");
-	// 			return;
-	// 		}
+			if (upcomingDueInvoices.length === 0) {
+				console.log("No invoices due tomorrow that need payment reminders");
+				return;
+			}
 
-	// 		console.log(
-	// 			`📧 Found ${upcomingDueInvoices.length} invoices due tomorrow, sending reminders...`,
-	// 		);
+			console.log(
+				`📧 Found ${upcomingDueInvoices.length} invoices due tomorrow, sending reminders...`,
+			);
 
-	// 		// Gửi thông báo cho từng hóa đơn
-	// 		for (const invoice of upcomingDueInvoices) {
-	// 			try {
-	// 				// Tìm resident của apartment này
-	// 				const apartmentResident =
-	// 					await this.apartmentResidentRepository.findOne({
-	// 						where: { apartmentId: invoice.apartmentId },
-	// 						relations: ["resident"],
-	// 					});
+			// Gửi thông báo cho từng hóa đơn
+			for (const invoice of upcomingDueInvoices) {
+				try {
+					// Tìm resident của apartment này
+					const apartmentResident =
+						await this.apartmentResidentRepository.findOne({
+							where: { apartmentId: invoice.apartmentId },
+							relations: ["resident"],
+						});
 
-	// 				if (!apartmentResident?.resident?.accountId) {
-	// 					console.log(
-	// 						`⚠️ No resident found for apartment ${invoice.apartment?.name}`,
-	// 					);
-	// 					continue;
-	// 				}
+					if (!apartmentResident?.resident?.accountId) {
+						console.log(
+							`⚠️ No resident found for apartment ${invoice.apartment?.name}`,
+						);
+						continue;
+					}
 
-	// 				const userId = apartmentResident.resident.accountId;
+					const userId = apartmentResident.resident.accountId;
 
-	// 				// Format số tiền
-	// 				const formattedAmount = new Intl.NumberFormat("vi-VN", {
-	// 					style: "currency",
-	// 					currency: "VND",
-	// 				}).format(invoice.totalAmount);
+					// Format số tiền
+					const formattedAmount = new Intl.NumberFormat("vi-VN", {
+						style: "currency",
+						currency: "VND",
+					}).format(invoice.totalAmount);
 
-	// 				// Gửi thông báo
-	// 				await this.systemNotificationsService.sendSystemNotification(
-	// 					{
-	// 						title: "⏰ Nhắc nhở thanh toán hóa đơn",
-	// 						content: `Hóa đơn ${invoice.invoiceCode} (${formattedAmount}) của căn hộ ${invoice.apartment?.name} sẽ đến hạn thanh toán vào ngày mai. Vui lòng thanh toán để tránh phát sinh phí trễ hạn.`,
-	// 						type: SystemNotificationType.WARNING,
-	// 						targetUserIds: [userId],
-	// 						metadata: {
-	// 							invoiceId: invoice.id,
-	// 							invoiceCode: invoice.invoiceCode,
-	// 							apartmentName: invoice.apartment?.name,
-	// 							totalAmount: invoice.totalAmount,
-	// 							dueDate: invoice.dueDate,
-	// 						},
-	// 						actionUrl: `/invoices/${invoice.id}`,
-	// 						actionText: "Xem hóa đơn",
-	// 						isPersistent: true,
-	// 					},
-	// 					1, // System user ID (admin/system)
-	// 				);
+					// Gửi thông báo
+					await this.systemNotificationsService.sendSystemNotification(
+						{
+							title: "⏰ Nhắc nhở thanh toán hóa đơn",
+							content: `Hóa đơn ${invoice.invoiceCode} (${formattedAmount}) của căn hộ ${invoice.apartment?.name} sẽ đến hạn thanh toán vào ngày mai. Vui lòng thanh toán để tránh phát sinh phí trễ hạn.`,
+							type: SystemNotificationType.WARNING,
+							targetUserIds: [userId],
+							metadata: {
+								invoiceId: invoice.id,
+								invoiceCode: invoice.invoiceCode,
+								apartmentName: invoice.apartment?.name,
+								totalAmount: invoice.totalAmount,
+								dueDate: invoice.dueDate,
+							},
+							actionUrl: `/invoices/${invoice.id}`,
+							actionText: "Xem hóa đơn",
+							isPersistent: true,
+						},
+						1, // System user ID (admin/system)
+					);
 
-	// 				console.log(
-	// 					`✅ Sent payment reminder for invoice ${invoice.invoiceCode} to user ${userId}`,
-	// 				);
-	// 			} catch (error) {
-	// 				console.error(
-	// 					`❌ Error sending reminder for invoice ${invoice.invoiceCode}:`,
-	// 					error,
-	// 				);
-	// 			}
-	// 		}
+					console.log(
+						`✅ Sent payment reminder for invoice ${invoice.invoiceCode} to user ${userId}`,
+					);
+				} catch (error) {
+					console.error(
+						`❌ Error sending reminder for invoice ${invoice.invoiceCode}:`,
+						error,
+					);
+				}
+			}
 
-	// 		console.log(
-	// 			`✅ Completed sending ${upcomingDueInvoices.length} payment reminders`,
-	// 		);
-	// 	} catch (error) {
-	// 		console.error("❌ Error sending payment reminder notifications:", error);
-	// 	}
-	// }
+			console.log(
+				`✅ Completed sending ${upcomingDueInvoices.length} payment reminders`,
+			);
+		} catch (error) {
+			console.error("❌ Error sending payment reminder notifications:", error);
+		}
+	}
 }
