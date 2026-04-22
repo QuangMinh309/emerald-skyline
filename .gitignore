@@ -106,3 +106,4 @@ htmlcov/
 !.vscode/tasks.json
 !.vscode/launch.json
 !.vscode/extensions.json
+web-fe/tsconfig.app.json
