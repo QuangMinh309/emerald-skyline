@@ -24,8 +24,8 @@ import DetailInvoicePage from "@/pages/Invoices/detail-invoice";
 // import DetailMaintenancePage from "@/pages/Maintenances/detail-maintenance";
 // import IssuesPage from "@/pages/Issues/view-issues";
 // import DetailIssuePage from "@/pages/Issues/detail-issue";
-// import FeesPage from "@/pages/Fees/view-fees";
-// import DetailFeePage from "@/pages/Fees/detail-fee";
+import FeesPage from "@/pages/Fees/view-fees";
+import DetailFeePage from "@/pages/Fees/detail-fee";
 import AccountsPage from "@/pages/Accounts/view-accounts";
 import DetailAccountPage from "@/pages/Accounts/detail-account";
 
@@ -258,22 +258,22 @@ export const routes = createBrowserRouter([
 			},
 
 			// // Fees - ADMIN only
-			// {
-			// 	path: "fees",
-			// 	element: (
-			// 		<RoleBasedRoute allowedRoles={["ADMIN"]}>
-			// 			<FeesPage />
-			// 		</RoleBasedRoute>
-			// 	),
-			// },
-			// {
-			// 	path: "fees/:id",
-			// 	element: (
-			// 		<RoleBasedRoute allowedRoles={["ADMIN"]}>
-			// 			<DetailFeePage />
-			// 		</RoleBasedRoute>
-			// 	),
-			// },
+			{
+				path: "fees",
+				element: (
+					<RoleBasedRoute allowedRoles={["ADMIN"]}>
+						<FeesPage />
+					</RoleBasedRoute>
+				),
+			},
+			{
+				path: "fees/:id",
+				element: (
+					<RoleBasedRoute allowedRoles={["ADMIN"]}>
+						<DetailFeePage />
+					</RoleBasedRoute>
+				),
+			},
 
 			// // Technicians - ADMIN only
 			// {
