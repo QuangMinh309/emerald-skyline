@@ -23,7 +23,7 @@ import {
 import { DatePicker } from "@/components/common/DatePicker";
 import { useCreateResident } from "@/hooks/data/useResidents";
 import { toast } from "sonner";
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { useProvinces, useProvinceDetails } from "@/hooks/useLocation";
 import { GenderTypeOptions } from "@/constants/genderType";
 import { UploadImages } from "@/components/common/UploadImages";
@@ -60,7 +60,22 @@ const CreateResidentModal = ({ open, setOpen }: ModalProps) => {
 	const { mutate: createResident, isPending } = useCreateResident();
 	const [image, setImage] = useState<File[]>([]);
 	const [cccdImage, setCccdImage] = useState<File | null>(null);
+	const [cccdPreviewUrl, setCccdPreviewUrl] = useState<string | null>(null);
 	const [isScanning, setIsScanning] = useState(false);
+
+	useEffect(() => {
+		if (!cccdImage) {
+			setCccdPreviewUrl(null);
+			return;
+		}
+
+		const previewUrl = URL.createObjectURL(cccdImage);
+		setCccdPreviewUrl(previewUrl);
+
+		return () => {
+			URL.revokeObjectURL(previewUrl);
+		};
+	}, [cccdImage]);
 
 	const form = useForm<ResidentFormValues>({
 		resolver: zodResolver(CreateResidentSchema),
@@ -217,6 +232,8 @@ const CreateResidentModal = ({ open, setOpen }: ModalProps) => {
 									const file = e.target.files?.[0];
 									if (file) {
 										setCccdImage(file);
+									} else {
+										setCccdImage(null);
 									}
 								}}
 								className="flex-1"
@@ -243,6 +260,18 @@ const CreateResidentModal = ({ open, setOpen }: ModalProps) => {
 						<p className="text-xs text-muted-foreground">
 							Chọn ảnh CCCD rồi nhấn "Quét CCCD" để tự động điền thông tin
 						</p>
+						{cccdPreviewUrl && (
+							<div className="space-y-2">
+								<p className="text-xs font-medium">Xem trước ảnh CCCD</p>
+								<div className="overflow-hidden rounded-md border bg-muted/20">
+									<img
+										src={cccdPreviewUrl}
+										alt="Xem trước ảnh CCCD"
+										className="h-48 w-full object-contain"
+									/>
+								</div>
+							</div>
+						)}
 					</div>
 
 					<div className="grid grid-cols-2 gap-x-4 gap-y-4">
