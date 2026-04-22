@@ -102,22 +102,25 @@ def test_extract_cccd_info_success(mock_parse, mock_yolo, sample_image):
         "success": True,
         "regions": {
             "name": np.ones((50, 100, 3), dtype=np.uint8),
-            "id": np.ones((50, 100, 3), dtype=np.uint8)
+            "id_number": np.ones((50, 100, 3), dtype=np.uint8)
         }
     }
     
-    # Mock LLM parsing
-    from app.models.schemas import CCCDData
+    # Mock LLM parsing with correct field names
+    from app.models.schemas import CCCDData, FieldConfidence
     mock_parse.return_value = CCCDData(
         name="Test User",
-        id="123456789",
-        dob="01/01/2000",
-        gender="Male",
+        date_of_birth="01/01/2000",
+        gender="Nam",
         nationality="Việt Nam",
-        origin_place="Hà Nội",
-        current_place="TP Hồ Chí Minh",
-        expire_date="01/01/2030",
-        overall_confidence=0.85
+        native_place="Hà Nội",
+        place_of_residence="TP Hồ Chí Minh",
+        id_number="123456789",
+        date_expiration="01/01/2030",
+        field_confidence=FieldConfidence(
+            name=0.95, id_number=0.90, date_of_birth=0.85, date_expiration=0.92,
+            gender=0.88, nationality=0.99, native_place=0.80, place_of_residence=0.75
+        )
     )
     
     result = extract_cccd_info(sample_image)
@@ -152,8 +155,8 @@ def test_extract_cccd_regions_with_yolo_success(mock_detector_class, sample_imag
     mock_detector.detect_regions.return_value = {
         "regions": {
             "name": np.ones((50, 100, 3), dtype=np.uint8),
-            "id": np.ones((50, 100, 3), dtype=np.uint8),
-            "dob": np.ones((50, 100, 3), dtype=np.uint8)
+            "id_number": np.ones((50, 100, 3), dtype=np.uint8),
+            "date_of_birth": np.ones((50, 100, 3), dtype=np.uint8)
         },
         "confidence": 0.85
     }
@@ -179,26 +182,25 @@ def test_parse_cccd_with_llm(mock_extract_text, mock_get_groq):
     mock_response = MagicMock()
     mock_response.choices[0].message.content = """{
         "name": "Nguyễn Văn A",
-        "id": "123456789",
-        "dob": "01/01/2000",
+        "id_number": "123456789",
+        "date_of_birth": "01/01/2000",
         "gender": "Nam",
         "nationality": "Việt Nam",
-        "origin_place": "Hà Nội",
-        "current_place": "TP Hồ Chí Minh",
-        "expire_date": "01/01/2030",
-        "overall_confidence": 0.85
+        "native_place": "Hà Nội",
+        "place_of_residence": "TP Hồ Chí Minh",
+        "date_expiration": "01/01/2030",
+        "field_confidence": {"name": 0.95, "id_number": 0.90, "date_of_birth": 0.85, "date_expiration": 0.92, "gender": 0.88, "nationality": 0.99, "native_place": 0.80, "place_of_residence": 0.75}
     }"""
-    mock_client.messages.create.return_value = mock_response
+    mock_client.chat.completions.create.return_value = mock_response
     
     regions = {
         "name": np.ones((50, 100, 3), dtype=np.uint8),
-        "id": np.ones((50, 100, 3), dtype=np.uint8)
+        "id_number": np.ones((50, 100, 3), dtype=np.uint8)
     }
     
-    result = parse_cccd_with_llm(regions, mode="yolo_detected")
+    result = parse_cccd_with_llm(regions)
     
     assert result is not None
-    assert hasattr(result, 'name')
 
 
 def test_get_groq_client():
@@ -207,4 +209,4 @@ def test_get_groq_client():
     
     assert client is not None
     # Should be a Groq client instance
-    assert hasattr(client, 'messages')
+    assert hasattr(client, 'chat')

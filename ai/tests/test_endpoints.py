@@ -103,18 +103,21 @@ def test_read_cccd_with_valid_image(mock_extract, client):
     """Test CCCD reading with valid image - successful extraction"""
     import numpy as np
     import cv2
-    from app.models.schemas import CCCDData
+    from app.models.schemas import CCCDData, FieldConfidence
     
     mock_data = CCCDData(
         name="Nguyễn Văn A",
-        id="123456789",
-        dob="01/01/2000",
-        gender="Male",
+        date_of_birth="01/01/2000",
+        gender="Nam",
         nationality="Việt Nam",
-        origin_place="Hà Nội",
-        current_place="TP Hồ Chí Minh",
-        expire_date="01/01/2030",
-        overall_confidence=0.95
+        native_place="Hà Nội",
+        place_of_residence="TP Hồ Chí Minh",
+        id_number="123456789",
+        date_expiration="01/01/2030",
+        field_confidence=FieldConfidence(
+            name=0.95, id_number=0.90, date_of_birth=0.85, date_expiration=0.92,
+            gender=0.88, nationality=0.99, native_place=0.80, place_of_residence=0.75
+        )
     )
     mock_extract.return_value = {"success": True, "data": mock_data}
     
