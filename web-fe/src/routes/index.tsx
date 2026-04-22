@@ -18,12 +18,12 @@ import UpdateVotingPage from "@/pages/Votings/update-voting";
 import DetailVotingPage from "@/pages/Votings/detail-voting";
 import InvoicesPage from "@/pages/Invoices/view-invoices";
 import DetailInvoicePage from "@/pages/Invoices/detail-invoice";
-// import TechniciansPage from "@/pages/Technicians/view-technicians";
-// import DetailTechnicianPage from "@/pages/Technicians/detail-technician";
-// import MaintenancesPage from "@/pages/Maintenances/view-maintenances";
-// import DetailMaintenancePage from "@/pages/Maintenances/detail-maintenance";
-// import IssuesPage from "@/pages/Issues/view-issues";
-// import DetailIssuePage from "@/pages/Issues/detail-issue";
+import TechniciansPage from "@/pages/Technicians/view-technicians";
+import DetailTechnicianPage from "@/pages/Technicians/detail-technician";
+import MaintenancesPage from "@/pages/Maintenances/view-maintenances";
+import DetailMaintenancePage from "@/pages/Maintenances/detail-maintenance";
+import IssuesPage from "@/pages/Issues/view-issues";
+import DetailIssuePage from "@/pages/Issues/detail-issue";
 import FeesPage from "@/pages/Fees/view-fees";
 import DetailFeePage from "@/pages/Fees/detail-fee";
 import AccountsPage from "@/pages/Accounts/view-accounts";
@@ -276,58 +276,58 @@ export const routes = createBrowserRouter([
 			},
 
 			// // Technicians - ADMIN only
-			// {
-			// 	path: "technicians",
-			// 	element: (
-			// 		<RoleBasedRoute allowedRoles={["ADMIN"]}>
-			// 			<TechniciansPage />
-			// 		</RoleBasedRoute>
-			// 	),
-			// },
-			// {
-			// 	path: "technicians/:id",
-			// 	element: (
-			// 		<RoleBasedRoute allowedRoles={["ADMIN"]}>
-			// 			<DetailTechnicianPage />
-			// 		</RoleBasedRoute>
-			// 	),
-			// },
+			{
+				path: "technicians",
+				element: (
+					<RoleBasedRoute allowedRoles={["ADMIN"]}>
+						<TechniciansPage />
+					</RoleBasedRoute>
+				),
+			},
+			{
+				path: "technicians/:id",
+				element: (
+					<RoleBasedRoute allowedRoles={["ADMIN"]}>
+						<DetailTechnicianPage />
+					</RoleBasedRoute>
+				),
+			},
 
 			// // Issues/Requests - ADMIN & TECHNICIAN
-			// {
-			// 	path: "issues",
-			// 	element: (
-			// 		<RoleBasedRoute allowedRoles={["ADMIN", "TECHNICIAN"]}>
-			// 			<IssuesPage />
-			// 		</RoleBasedRoute>
-			// 	),
-			// },
-			// {
-			// 	path: "issues/:id",
-			// 	element: (
-			// 		<RoleBasedRoute allowedRoles={["ADMIN", "TECHNICIAN"]}>
-			// 			<DetailIssuePage />
-			// 		</RoleBasedRoute>
-			// 	),
-			// },
+			{
+				path: "issues",
+				element: (
+					<RoleBasedRoute allowedRoles={["ADMIN", "TECHNICIAN"]}>
+						<IssuesPage />
+					</RoleBasedRoute>
+				),
+			},
+			{
+				path: "issues/:id",
+				element: (
+					<RoleBasedRoute allowedRoles={["ADMIN", "TECHNICIAN"]}>
+						<DetailIssuePage />
+					</RoleBasedRoute>
+				),
+			},
 
-			// // Maintenances - ADMIN & TECHNICIAN
-			// {
-			// 	path: "maintenances",
-			// 	element: (
-			// 		<RoleBasedRoute allowedRoles={["ADMIN", "TECHNICIAN"]}>
-			// 			<MaintenancesPage />
-			// 		</RoleBasedRoute>
-			// 	),
-			// },
-			// {
-			// 	path: "maintenances/:id",
-			// 	element: (
-			// 		<RoleBasedRoute allowedRoles={["ADMIN", "TECHNICIAN"]}>
-			// 			<DetailMaintenancePage />
-			// 		</RoleBasedRoute>
-			// 	),
-			// },
+			// Maintenances - ADMIN & TECHNICIAN
+			{
+				path: "maintenances",
+				element: (
+					<RoleBasedRoute allowedRoles={["ADMIN", "TECHNICIAN"]}>
+						<MaintenancesPage />
+					</RoleBasedRoute>
+				),
+			},
+			{
+				path: "maintenances/:id",
+				element: (
+					<RoleBasedRoute allowedRoles={["ADMIN", "TECHNICIAN"]}>
+						<DetailMaintenancePage />
+					</RoleBasedRoute>
+				),
+			},
 
 			// Profile - all authenticated users
 			{ path: "profile", element: <ProfilePage /> },
