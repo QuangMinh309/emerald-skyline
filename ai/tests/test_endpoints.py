@@ -53,7 +53,7 @@ def test_read_cccd_invalid_file(client):
     assert response.status_code == 400
 
 
-@patch('app.services.ocr_service.extract_meter_reading_from_image')
+@patch('app.services.ocr_service.extract_meter_reading')
 def test_read_meter_with_image(mock_extract, client):
     """Test meter reading with valid image"""
     mock_extract.return_value = "12345.67"
@@ -72,7 +72,7 @@ def test_read_meter_with_image(mock_extract, client):
     
     assert response.status_code == 200
     data = response.json()
-    assert "success" in data or "data" in data
+    assert "status" in data or "meter_reading" in data
 
 
 def test_summarize_no_file(client):
@@ -81,10 +81,10 @@ def test_summarize_no_file(client):
     assert response.status_code == 422  # Missing required file
 
 
-@patch('app.services.llm_service.summarize_content')
+@patch('app.services.llm_service.summarize_to_json')
 def test_summarize_with_file(mock_summarize, client):
     """Test summarize endpoint with valid file"""
-    mock_summarize.return_value = {"summary": "Test summary", "events": []}
+    mock_summarize.return_value = {"events": []}
     
     # Create a text file
     response = client.post(
@@ -94,4 +94,4 @@ def test_summarize_with_file(mock_summarize, client):
     
     assert response.status_code == 200
     data = response.json()
-    assert "success" in data or "data" in data
+    assert "events" in data or "status" in data
