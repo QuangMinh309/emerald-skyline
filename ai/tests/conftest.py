@@ -6,6 +6,9 @@ import sys
 import numpy as np
 from pathlib import Path
 
+# Set mock GROQ API key BEFORE importing app (to avoid initialization error)
+os.environ['GROQ_API_KEY'] = 'test-api-key-mock-for-testing-only'
+
 # Add app to path
 sys.path.insert(0, str(Path(__file__).parent.parent))
 

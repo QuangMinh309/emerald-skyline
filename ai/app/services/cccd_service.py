@@ -17,7 +17,16 @@ import numpy as np
 
 # Initialize OCR model (singleton)
 ocr_model = PaddleOCR(use_angle_cls=True, lang='en')
-groq_client = Groq(api_key=settings.GROQ_API_KEY)
+
+# Lazy initialization for Groq client
+_groq_client = None
+
+def get_groq_client() -> Groq:
+    """Get or create Groq client (lazy initialization)"""
+    global _groq_client
+    if _groq_client is None:
+        _groq_client = Groq(api_key=settings.GROQ_API_KEY)
+    return _groq_client
 
 
 def decode_image(file_bytes: bytes):
@@ -515,7 +524,7 @@ IMPORTANT NOTES:
     """
 
     try:
-        chat_completion = groq_client.chat.completions.create(
+        chat_completion = get_groq_client().chat.completions.create(
             messages=[
                 {"role": "system", "content": system_prompt},
                 {"role": "user", "content": f"YOLO Detected Regions (OCR results):\n\n{region_context}"}
