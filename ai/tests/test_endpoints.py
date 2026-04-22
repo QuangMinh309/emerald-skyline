@@ -18,7 +18,7 @@ def test_read_root(client):
     response = client.get("/")
     assert response.status_code == 200
     data = response.json()
-    assert "status" in data
+    assert "message" in data
 
 
 def test_read_meter_no_file(client):
@@ -76,9 +76,10 @@ def test_read_meter_with_image(mock_extract, client):
 
 
 def test_summarize_no_file(client):
-    """Test summarize endpoint without file"""
+    """Test summarize endpoint without file or text"""
     response = client.post("/api/v1/ai/summarize")
-    assert response.status_code == 422  # Missing required file
+    # Both file and text are optional, but returns 400 if both empty/too short
+    assert response.status_code == 400
 
 
 @patch('app.services.llm_service.summarize_to_json')
