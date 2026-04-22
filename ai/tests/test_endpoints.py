@@ -114,6 +114,7 @@ def test_read_cccd_with_valid_image(mock_extract, client):
         place_of_residence="TP Hồ Chí Minh",
         id_number="123456789",
         date_expiration="01/01/2030",
+        overall_confidence=0.95,
         field_confidence=FieldConfidence(
             name=0.95, id_number=0.90, date_of_birth=0.85, date_expiration=0.92,
             gender=0.88, nationality=0.99, native_place=0.80, place_of_residence=0.75

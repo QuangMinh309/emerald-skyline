@@ -72,18 +72,20 @@ def test_merge_regions():
     detector = YOLOCCCDDetector.__new__(YOLOCCCDDetector)
     detector.model = None
     
-    # Create test regions that should be merged
+    # Create test regions as list of dicts
     regions = [
         {"x1": 10, "y1": 20, "x2": 100, "y2": 40, "class": "name"},
         {"x1": 15, "y1": 25, "x2": 95, "y2": 45, "class": "name"},  # overlaps
         {"x1": 200, "y1": 20, "x2": 300, "y2": 40, "class": "id_number"},
     ]
     
-    merged = detector._merge_regions(regions, test_image)
+    # _merge_regions returns a list of merged regions
+    result = detector._merge_regions(regions, test_image)
     
-    assert len(merged) > 0
-    # At least some regions should be merged
-    assert len(merged) <= len(regions)
+    # Should return a list (possibly merged)
+    assert isinstance(result, list)
+    assert len(result) > 0
+    assert len(result) <= len(regions)
 
 
 def test_detect_regions_no_detections():

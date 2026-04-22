@@ -106,7 +106,7 @@ def test_extract_cccd_info_success(mock_parse, mock_yolo, sample_image):
         }
     }
     
-    # Mock LLM parsing with correct field names
+    # Mock LLM parsing with ALL required fields
     from app.models.schemas import CCCDData, FieldConfidence
     mock_parse.return_value = CCCDData(
         name="Test User",
@@ -117,6 +117,7 @@ def test_extract_cccd_info_success(mock_parse, mock_yolo, sample_image):
         place_of_residence="TP Hồ Chí Minh",
         id_number="123456789",
         date_expiration="01/01/2030",
+        overall_confidence=0.85,
         field_confidence=FieldConfidence(
             name=0.95, id_number=0.90, date_of_birth=0.85, date_expiration=0.92,
             gender=0.88, nationality=0.99, native_place=0.80, place_of_residence=0.75
@@ -146,12 +147,12 @@ def test_extract_cccd_info_failure(mock_parse, mock_yolo, sample_image):
     assert "error" in result
 
 
-@patch('app.services.cccd_service.YOLOCCCDDetector')
-def test_extract_cccd_regions_with_yolo_success(mock_detector_class, sample_image):
+@patch('app.services.cccd_service.get_cccd_detector')
+def test_extract_cccd_regions_with_yolo_success(mock_get_detector, sample_image):
     """Test YOLO detection with successful regions"""
-    # Mock detector instance
+    # Mock detector function
     mock_detector = MagicMock()
-    mock_detector_class.return_value = mock_detector
+    mock_get_detector.return_value = mock_detector
     mock_detector.detect_regions.return_value = {
         "regions": {
             "name": np.ones((50, 100, 3), dtype=np.uint8),
