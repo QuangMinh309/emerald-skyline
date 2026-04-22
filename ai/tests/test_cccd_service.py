@@ -7,6 +7,10 @@ from app.services.cccd_service import (
     decode_image,
     extract_text_from_region,
     _cluster_text_blocks_into_fields,
+    extract_cccd_info,
+    extract_cccd_regions_with_yolo,
+    parse_cccd_with_llm,
+    get_groq_client,
 )
 
 
@@ -87,3 +91,120 @@ def test_cluster_empty_text_blocks():
     
     assert isinstance(result, dict)
     assert len(result) == 0
+
+
+@patch('app.services.cccd_service.extract_cccd_regions_with_yolo')
+@patch('app.services.cccd_service.parse_cccd_with_llm')
+def test_extract_cccd_info_success(mock_parse, mock_yolo, sample_image):
+    """Test extract_cccd_info with successful extraction"""
+    # Mock YOLO detection
+    mock_yolo.return_value = {
+        "success": True,
+        "regions": {
+            "name": np.ones((50, 100, 3), dtype=np.uint8),
+            "id": np.ones((50, 100, 3), dtype=np.uint8)
+        }
+    }
+    
+    # Mock LLM parsing
+    from app.models.schemas import CCCDData
+    mock_parse.return_value = CCCDData(
+        name="Test User",
+        id="123456789",
+        dob="01/01/2000",
+        gender="Male",
+        nationality="Việt Nam",
+        origin_place="Hà Nội",
+        current_place="TP Hồ Chí Minh",
+        expire_date="01/01/2030",
+        overall_confidence=0.85
+    )
+    
+    result = extract_cccd_info(sample_image)
+    
+    assert result["success"] is True
+    assert result["data"] is not None
+    assert result["data"].name == "Test User"
+
+
+@patch('app.services.cccd_service.extract_cccd_regions_with_yolo')
+@patch('app.services.cccd_service.parse_cccd_with_llm')
+def test_extract_cccd_info_failure(mock_parse, mock_yolo, sample_image):
+    """Test extract_cccd_info with extraction failure"""
+    # Mock YOLO detection failure
+    mock_yolo.return_value = {
+        "success": False,
+        "error": "YOLO detection failed"
+    }
+    
+    result = extract_cccd_info(sample_image)
+    
+    assert result["success"] is False
+    assert "error" in result
+
+
+@patch('app.services.cccd_service.YOLOCCCDDetector')
+def test_extract_cccd_regions_with_yolo_success(mock_detector_class, sample_image):
+    """Test YOLO detection with successful regions"""
+    # Mock detector instance
+    mock_detector = MagicMock()
+    mock_detector_class.return_value = mock_detector
+    mock_detector.detect_regions.return_value = {
+        "regions": {
+            "name": np.ones((50, 100, 3), dtype=np.uint8),
+            "id": np.ones((50, 100, 3), dtype=np.uint8),
+            "dob": np.ones((50, 100, 3), dtype=np.uint8)
+        },
+        "confidence": 0.85
+    }
+    
+    result = extract_cccd_regions_with_yolo(sample_image)
+    
+    assert result["success"] is True
+    assert "regions" in result
+
+
+@patch('app.services.cccd_service.get_groq_client')
+@patch('app.services.cccd_service.extract_text_from_region')
+def test_parse_cccd_with_llm(mock_extract_text, mock_get_groq):
+    """Test LLM parsing of CCCD data"""
+    # Mock text extraction
+    mock_extract_text.return_value = "Nguyễn Văn A"
+    
+    # Mock Groq client
+    mock_client = MagicMock()
+    mock_get_groq.return_value = mock_client
+    
+    # Mock LLM response
+    mock_response = MagicMock()
+    mock_response.choices[0].message.content = """{
+        "name": "Nguyễn Văn A",
+        "id": "123456789",
+        "dob": "01/01/2000",
+        "gender": "Nam",
+        "nationality": "Việt Nam",
+        "origin_place": "Hà Nội",
+        "current_place": "TP Hồ Chí Minh",
+        "expire_date": "01/01/2030",
+        "overall_confidence": 0.85
+    }"""
+    mock_client.messages.create.return_value = mock_response
+    
+    regions = {
+        "name": np.ones((50, 100, 3), dtype=np.uint8),
+        "id": np.ones((50, 100, 3), dtype=np.uint8)
+    }
+    
+    result = parse_cccd_with_llm(regions, mode="yolo_detected")
+    
+    assert result is not None
+    assert hasattr(result, 'name')
+
+
+def test_get_groq_client():
+    """Test Groq client lazy initialization"""
+    client = get_groq_client()
+    
+    assert client is not None
+    # Should be a Groq client instance
+    assert hasattr(client, 'messages')

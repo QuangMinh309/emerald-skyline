@@ -113,13 +113,13 @@ jobs:
             --ignore=W293,W291 \
             --statistics
 
-      - name: Test with pytest (coverage >=50%)
+      - name: Test with pytest (coverage >=55%)
         run: |
           cd ai
           pytest --tb=short \
                 --cov=app \
                 --cov-report=term-missing \
-                --cov-fail-under=50
+                --cov-fail-under=55
 
   build-backend:
     name: Build Backend (Docker)

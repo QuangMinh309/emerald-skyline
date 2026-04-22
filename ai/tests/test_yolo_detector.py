@@ -64,3 +64,54 @@ def test_preprocess_small_image():
     # Should be upscaled
     assert preprocessed.shape[0] >= test_image.shape[0]
     assert preprocessed.shape[1] >= test_image.shape[1]
+
+
+def test_merge_regions():
+    """Test merging overlapping regions"""
+    detector = YOLOCCCDDetector.__new__(YOLOCCCDDetector)
+    detector.model = None
+    
+    # Create test regions that should be merged
+    regions = [
+        {"x1": 10, "y1": 20, "x2": 100, "y2": 40, "class": "name"},
+        {"x1": 15, "y1": 25, "x2": 95, "y2": 45, "class": "name"},  # overlaps
+        {"x1": 200, "y1": 20, "x2": 300, "y2": 40, "class": "id"},
+    ]
+    
+    merged = detector._merge_regions(regions)
+    
+    assert len(merged) > 0
+    # At least some regions should be merged
+    assert len(merged) <= len(regions)
+
+
+def test_detect_regions_no_detections():
+    """Test detection when no regions are found"""
+    test_image = np.random.randint(0, 255, (300, 400, 3), dtype=np.uint8)
+    
+    detector = YOLOCCCDDetector.__new__(YOLOCCCDDetector)
+    detector.model = MagicMock()
+    
+    # Mock predict to return no detections
+    mock_result = MagicMock()
+    mock_result.boxes = MagicMock()
+    mock_result.boxes.xyxy = np.array([])
+    mock_result.boxes.conf = np.array([])
+    mock_result.boxes.cls = np.array([])
+    detector.model.predict.return_value = [mock_result]
+    
+    result = detector.detect_regions(test_image)
+    
+    assert result is not None
+    # Should handle empty detections gracefully
+    assert isinstance(result, dict)
+
+
+@patch('app.services.yolo_detector.YOLO')
+def test_detector_initialization_with_custom_path(mock_yolo):
+    """Test detector initialization with custom model path"""
+    mock_model = MagicMock()
+    mock_yolo.return_value = mock_model
+    
+    detector = YOLOCCCDDetector("custom_model.pt")
+    assert detector.model is not None
