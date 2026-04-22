@@ -13,9 +13,9 @@ import UpdateBlockPage from "@/pages/Blocks/update-block";
 import DetailBlockPage from "@/pages/Blocks/detail-block";
 import DetailApartmentPage from "@/pages/Apartments/detail-apartment";
 import ApartmentsPage from "@/pages/Apartments/view-apartments";
-// import CreateVotingPage from "@/pages/Votings/create-voting";
-// import UpdateVotingPage from "@/pages/Votings/update-voting";
-// import DetailVotingPage from "@/pages/Votings/detail-voting";
+import CreateVotingPage from "@/pages/Votings/create-voting";
+import UpdateVotingPage from "@/pages/Votings/update-voting";
+import DetailVotingPage from "@/pages/Votings/detail-voting";
 import InvoicesPage from "@/pages/Invoices/view-invoices";
 import DetailInvoicePage from "@/pages/Invoices/detail-invoice";
 // import TechniciansPage from "@/pages/Technicians/view-technicians";
@@ -34,14 +34,14 @@ const Assets = lazy(() => import("@/pages/Assets/view-assets"));
 // 	() => import("@/pages/Notifications/view-notifications"),
 // );
 // const SystemNotifications = lazy(() => import("@/pages/SystemNotifications"));
-// const Services = lazy(() => import("@/pages/Services"));
+const Services = lazy(() => import("@/pages/Services"));
 // const Report = lazy(() => import("@/pages/Report"));
-// const DetailServicePage = lazy(() => import("@/pages/Services/DetailService"));
+const DetailServicePage = lazy(() => import("@/pages/Services/DetailService"));
 const Login = lazy(() => import("@/pages/Login"));
 const ForgotPassword = lazy(() => import("@/pages/ForgotPassword"));
 const VerifyEmail = lazy(() => import("@/pages/VerifyEmail"));
 const ResetPassword = lazy(() => import("@/pages/ResetPassword"));
-// const VotingsPage = lazy(() => import("@/pages/Votings/view-votings"));
+const VotingsPage = lazy(() => import("@/pages/Votings/view-votings"));
 const ProfilePage = lazy(() => import("@/pages/Profile"));
 const UnauthorizedPage = lazy(() => import("@/pages/Unauthorized"));
 
@@ -126,22 +126,22 @@ export const routes = createBrowserRouter([
 			},
 
 			// // Services - ADMIN only
-			// {
-			// 	path: "services",
-			// 	element: (
-			// 		<RoleBasedRoute allowedRoles={["ADMIN"]}>
-			// 			<Services />
-			// 		</RoleBasedRoute>
-			// 	),
-			// },
-			// {
-			// 	path: "services/:id",
-			// 	element: (
-			// 		<RoleBasedRoute allowedRoles={["ADMIN"]}>
-			// 			<DetailServicePage />
-			// 		</RoleBasedRoute>
-			// 	),
-			// },
+			{
+				path: "services",
+				element: (
+					<RoleBasedRoute allowedRoles={["ADMIN"]}>
+						<Services />
+					</RoleBasedRoute>
+				),
+			},
+			{
+				path: "services/:id",
+				element: (
+					<RoleBasedRoute allowedRoles={["ADMIN"]}>
+						<DetailServicePage />
+					</RoleBasedRoute>
+				),
+			},
 
 			// // Reports - ADMIN only
 			// {
@@ -206,38 +206,38 @@ export const routes = createBrowserRouter([
 			},
 
 			// // Votings - ADMIN only
-			// {
-			// 	path: "votings",
-			// 	element: (
-			// 		<RoleBasedRoute allowedRoles={["ADMIN"]}>
-			// 			<VotingsPage />
-			// 		</RoleBasedRoute>
-			// 	),
-			// },
-			// {
-			// 	path: "votings/create",
-			// 	element: (
-			// 		<RoleBasedRoute allowedRoles={["ADMIN"]}>
-			// 			<CreateVotingPage />
-			// 		</RoleBasedRoute>
-			// 	),
-			// },
-			// {
-			// 	path: "votings/update/:id",
-			// 	element: (
-			// 		<RoleBasedRoute allowedRoles={["ADMIN"]}>
-			// 			<UpdateVotingPage />
-			// 		</RoleBasedRoute>
-			// 	),
-			// },
-			// {
-			// 	path: "votings/:id",
-			// 	element: (
-			// 		<RoleBasedRoute allowedRoles={["ADMIN"]}>
-			// 			<DetailVotingPage />
-			// 		</RoleBasedRoute>
-			// 	),
-			// },
+			{
+				path: "votings",
+				element: (
+					<RoleBasedRoute allowedRoles={["ADMIN"]}>
+						<VotingsPage />
+					</RoleBasedRoute>
+				),
+			},
+			{
+				path: "votings/create",
+				element: (
+					<RoleBasedRoute allowedRoles={["ADMIN"]}>
+						<CreateVotingPage />
+					</RoleBasedRoute>
+				),
+			},
+			{
+				path: "votings/update/:id",
+				element: (
+					<RoleBasedRoute allowedRoles={["ADMIN"]}>
+						<UpdateVotingPage />
+					</RoleBasedRoute>
+				),
+			},
+			{
+				path: "votings/:id",
+				element: (
+					<RoleBasedRoute allowedRoles={["ADMIN"]}>
+						<DetailVotingPage />
+					</RoleBasedRoute>
+				),
+			},
 
 			// // Invoices - ADMIN only
 			{
