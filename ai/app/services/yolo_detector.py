@@ -130,6 +130,10 @@ class YOLOCCCDDetector:
         if self.model is None:
             raise RuntimeError("Model not loaded")
         
+        # Step 1: Preprocess image for better detection
+        processed_image = self._preprocess_image(image)
+        print(f"📷 Image preprocessed: {processed_image.shape}")
+        
         # Step 2: Run inference with multi-scale detection
         detections = {}
         
