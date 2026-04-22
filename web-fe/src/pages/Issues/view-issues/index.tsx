@@ -10,7 +10,6 @@ import CustomTable from "@/components/common/CustomTable";
 import { SearchBar } from "@/components/common/SearchBar";
 import { TabNavigation } from "@/components/common/TabNavigation";
 import { Button } from "@/components/ui/button";
-import ModuleAccessGuard from "@/components/auth/ModuleAccessGuard";
 
 import RejectIssueModal from "@/pages/Issues/reject-issue";
 import ReceiveIssueModal from "@/pages/Issues/receive-issue";
@@ -25,7 +24,7 @@ import type { TabItem } from "@/types";
 
 const IssuesPage = () => {
 	const navigate = useNavigate();
-	const { canUpdate, userRole } = usePermission();
+	const { userRole } = usePermission();
 
 	const [searchTerm, setSearchTerm] = useState("");
 	const [activeTab, setActiveTab] = useState("ALL");

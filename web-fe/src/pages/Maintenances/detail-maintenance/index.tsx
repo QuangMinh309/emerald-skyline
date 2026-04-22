@@ -116,9 +116,7 @@ const DetailMaintenancePage = () => {
      Derived values
   ===================== */
 	const typeOption = TicketTypeOptions.find((o) => o.value === ticket?.type);
-	const priorityOption = TicketPriorityOptions.find(
-		(o) => o.value === ticket?.priority,
-	);
+	TicketPriorityOptions.find((o) => o.value === ticket?.priority);
 	const resultOption = MaintenanceResultOptions.find(
 		(o) => o.value === ticket?.result,
 	);

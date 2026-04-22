@@ -1,7 +1,7 @@
 import { useParams, useNavigate } from "react-router-dom";
 import { useGetTechnicianById } from "@/hooks/data/useTechnicians";
 import { Button } from "@/components/ui/button";
-import { ArrowLeft, Edit, Trash2 } from "lucide-react";
+import { Edit, Trash2 } from "lucide-react";
 import { TechnicianStatusMap } from "@/constants/technicianStatus";
 import { useState } from "react";
 import UpdateTechnicianModal from "../update-technician";
@@ -11,7 +11,7 @@ import PageHeader from "@/components/common/PageHeader";
 
 const TechnicianDetail = () => {
 	const { id } = useParams<{ id: string }>();
-	const navigate = useNavigate();
+	useNavigate();
 	const { data: technician, isLoading } = useGetTechnicianById(Number(id) || 0);
 
 	const [showUpdateModal, setShowUpdateModal] = useState(false);
