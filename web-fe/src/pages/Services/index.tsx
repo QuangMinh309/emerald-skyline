@@ -1,14 +1,12 @@
 import { useMemo, useState } from "react";
-import { Plus, Printer, FileDown, Trash2 } from "lucide-react";
+import { Plus, Trash2 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 
 import PageHeader from "@/components/common/PageHeader";
-import ActionDropdown from "@/components/common/ActionDropdown";
 import CustomTable from "@/components/common/CustomTable";
 import { SearchBar } from "@/components/common/SearchBar";
 
 import { normalizeString } from "@/utils/string";
-import type { ActionOption } from "@/types";
 
 import type { Service } from "@/types/service";
 import { serviceColumns } from "./columns";

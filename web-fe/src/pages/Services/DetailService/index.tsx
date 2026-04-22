@@ -35,7 +35,7 @@ const DetailServicePage = () => {
 	const [isDeleteOpen, setIsDeleteOpen] = useState(false);
 
 	const [isUpdateOpen, setIsUpdateOpen] = useState(false);
-	const [serviceToEdit, setServiceToEdit] = useState<Service | null>(null);
+	const [, setServiceToEdit] = useState<Service | null>(null);
 
 	// Service query
 	const {
