@@ -291,6 +291,51 @@ jobs:
             echo "- main: coverage gate from Vitest config (>=35%)"
           } >> "$GITHUB_STEP_SUMMARY"
 
+  mobile-tests:
+    name: Test Mobile (Unit + Integration/Coverage)
+    needs: [changes, code-quality]
+    if: needs.changes.outputs.mobile == 'true'
+    runs-on: ubuntu-latest
+
+    defaults:
+      run:
+        working-directory: mobile-fe
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: "npm"
+          cache-dependency-path: mobile-fe/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: PR gate (fast)
+        if: github.event_name == 'pull_request'
+        run: |
+          npm run test:unit
+          npm run test:integration
+
+      - name: Main gate (coverage >= 35%)
+        if: github.ref == 'refs/heads/main'
+        run: npm run test:coverage
+
+      - name: Mobile test summary
+        if: always()
+        run: |
+          {
+            echo "### Mobile Test Gate"
+            echo ""
+            echo "- Event: ${{ github.event_name }}"
+            echo "- Ref: ${{ github.ref_name }}"
+            echo "- PR: unit + integration"
+            echo "- main: coverage gate from Vitest config (>=35%)"
+          } >> "$GITHUB_STEP_SUMMARY"
+
   frontend-e2e:
     name: E2E Frontend (Playwright)
     needs: [changes, frontend-tests]
