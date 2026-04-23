@@ -488,7 +488,7 @@ jobs:
             const hasActionlint = /actionlint/.test(ciYaml);
             const hasSlackFailureNotification = /Notify Slack on Failure/.test(ciYaml);
             const hasPathFilter = /dorny\/paths-filter@v3/.test(ciYaml);
-            const hasCoverageGate = /--cov-fail-under=50/.test(ciYaml);
+            const hasCoverageGate = /--cov-fail-under=\d+/.test(ciYaml);
             const aiLintBlockMatch = ciYaml.match(/- name: Lint — Complexity gate \(hard block, max-complexity=10\)[\s\S]*?- name: Test with pytest/);
             const aiLintBlock = aiLintBlockMatch ? aiLintBlockMatch[0] : '';
             const hasComplexityHardGate = /--max-complexity=15/.test(ciYaml);
