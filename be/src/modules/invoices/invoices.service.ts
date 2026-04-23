@@ -3,7 +3,6 @@
 import { HttpException, HttpStatus, Injectable } from "@nestjs/common";
 import { Cron, CronExpression } from "@nestjs/schedule";
 import { InjectRepository } from "@nestjs/typeorm";
-import { SystemNotificationType } from "src/modules/system-notifications/entities/system-notification.entity";
 import { Between, In, Repository } from "typeorm";
 import { Apartment } from "../apartments/entities/apartment.entity";
 import { ApartmentResident } from "../apartments/entities/apartment-resident.entity";
@@ -12,6 +11,7 @@ import { Fee } from "../fees/entities/fee.entity";
 import { FeeTier } from "../fees/entities/fee-tier.entity";
 import { FeeType } from "../fees/enums/fee-type.enum";
 import { Resident } from "../residents/entities/resident.entity";
+import { SystemNotificationType } from "../system-notifications/entities/system-notification.entity";
 import { SystemNotificationsService } from "../system-notifications/system-notifications.service";
 import { CreateInvoiceAdminDto } from "./dto/create-invoice-admin.dto";
 import { CreateInvoiceClientDto } from "./dto/create-invoice-client.dto";
