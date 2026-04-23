@@ -19,6 +19,7 @@ vi.mock("@/lib/axios", () => ({
 
 import {
 	changePassword,
+	getProfile,
 	login,
 	logout,
 	refreshToken,
@@ -80,5 +81,29 @@ describe("auth service integration", () => {
 		);
 		expect(mockedAxiosInstance.post).toHaveBeenNthCalledWith(2, "/auth/logout");
 		expect(changed).toEqual({ ok: true });
+	});
+
+	it("propagates login errors", async () => {
+		mockedRefreshAxios.post.mockRejectedValueOnce(new Error("Unauthorized"));
+
+		await expect(
+			login({
+				email: "admin@example.com",
+				password: "secret",
+			}),
+		).rejects.toThrow("Unauthorized");
+
+		expect(mockedRefreshAxios.post).toHaveBeenCalledWith("/auth/login", {
+			email: "admin@example.com",
+			password: "secret",
+		});
+	});
+
+	it("propagates profile lookup errors", async () => {
+		mockedAxiosInstance.get.mockRejectedValueOnce(new Error("Forbidden"));
+
+		await expect(getProfile()).rejects.toThrow("Forbidden");
+
+		expect(mockedAxiosInstance.get).toHaveBeenCalledWith("/auth/profile");
 	});
 });

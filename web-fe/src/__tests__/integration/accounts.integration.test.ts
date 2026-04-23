@@ -14,9 +14,11 @@ vi.mock("@/lib/axios", () => ({
 }));
 
 import {
+	createAccount,
 	deleteManyAccounts,
 	getAccountById,
 	getAccounts,
+	restoreAccount,
 	updateAccount,
 } from "@/services/accounts.service";
 
@@ -47,14 +49,14 @@ describe("accounts service integration", () => {
 		const result = await updateAccount({
 			id: 7,
 			data: {
-				fullName: "Updated User",
+				email: "updated.user@example.com",
 				role: "TECHNICIAN",
 				isActive: true,
 			},
 		});
 
 		expect(mockedAxiosInstance.patch).toHaveBeenCalledWith("/accounts/7", {
-			fullName: "Updated User",
+			email: "updated.user@example.com",
 			role: "TECHNICIAN",
 			isActive: true,
 		});
@@ -79,5 +81,40 @@ describe("accounts service integration", () => {
 		);
 		expect(detail).toEqual({ id: 12 });
 		expect(deleted).toEqual({ success: true });
+	});
+
+	it("propagates account lookup errors", async () => {
+		mockedAxiosInstance.get.mockRejectedValueOnce(new Error("Not Found"));
+
+		await expect(getAccountById(404)).rejects.toThrow("Not Found");
+
+		expect(mockedAxiosInstance.get).toHaveBeenCalledWith("/accounts/404");
+	});
+
+	it("creates and restores account", async () => {
+		mockedAxiosInstance.post.mockResolvedValueOnce({
+			data: { data: { id: 15, email: "admin-new@example.com" } },
+		});
+		mockedAxiosInstance.patch.mockResolvedValueOnce({
+			data: { data: { id: 15, isActive: true } },
+		});
+
+		const created = await createAccount({
+			email: "admin-new@example.com",
+			password: "secret123",
+			role: "ADMIN",
+		});
+		const restored = await restoreAccount(15);
+
+		expect(mockedAxiosInstance.post).toHaveBeenCalledWith("/accounts", {
+			email: "admin-new@example.com",
+			password: "secret123",
+			role: "ADMIN",
+		});
+		expect(mockedAxiosInstance.patch).toHaveBeenCalledWith(
+			"/accounts/15/restore",
+		);
+		expect(created).toEqual({ id: 15, email: "admin-new@example.com" });
+		expect(restored).toEqual({ id: 15, isActive: true });
 	});
 });

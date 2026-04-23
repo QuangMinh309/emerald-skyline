@@ -57,6 +57,9 @@ test.describe("Auth and access flows", () => {
 
 		await page.goto("/invoices");
 		await expect(page).toHaveURL(/\/invoices$/);
+
+		await page.goto("/technicians");
+		await expect(page).toHaveURL(/\/technicians$/);
 	});
 
 	test("redirects technician from admin-only route to unauthorized", async ({
@@ -75,6 +78,9 @@ test.describe("Auth and access flows", () => {
 
 		await page.goto("/issues");
 		await expect(page).toHaveURL(/\/issues$/);
+
+		await page.goto("/maintenances");
+		await expect(page).toHaveURL(/\/maintenances$/);
 
 		await page.goto("/accounts");
 		await expect(page).toHaveURL(/\/unauthorized$/);
