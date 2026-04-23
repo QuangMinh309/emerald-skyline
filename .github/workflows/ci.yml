@@ -312,7 +312,7 @@ jobs:
           cache-dependency-path: mobile-fe/package-lock.json
 
       - name: Install dependencies
-        run: npm install --legacy-peer-deps
+        run: npm install --legacy-peer-deps --include=optional
 
       - name: PR gate (fast)
         if: github.event_name == 'pull_request'
