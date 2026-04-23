@@ -17,7 +17,16 @@ import numpy as np
 
 # Initialize OCR model (singleton)
 ocr_model = PaddleOCR(use_angle_cls=True, lang='en')
-groq_client = Groq(api_key=settings.GROQ_API_KEY)
+
+# Lazy initialization for Groq client
+_groq_client = None
+
+def get_groq_client() -> Groq:
+    """Get or create Groq client (lazy initialization)"""
+    global _groq_client
+    if _groq_client is None:
+        _groq_client = Groq(api_key=settings.GROQ_API_KEY)
+    return _groq_client
 
 
 def decode_image(file_bytes: bytes):
@@ -91,6 +100,7 @@ def extract_text_from_region(region_image: np.ndarray, field_type: str = "genera
 def extract_cccd_regions_with_yolo(image_array: np.ndarray) -> Dict[str, Dict]:
     """
     Phase 1: Use YOLO to detect and extract regions from CCCD
+    Falls back to full-image OCR if YOLO fails
     
     Args:
         image_array: Input image
@@ -111,11 +121,16 @@ def extract_cccd_regions_with_yolo(image_array: np.ndarray) -> Dict[str, Dict]:
     
     try:
         detector = get_cccd_detector("best.pt")
-        detections = detector.detect_regions(image_array, conf_threshold=0.5)
+        detections = detector.detect_regions(image_array, conf_threshold=0.3)
         
         # Validate detections
         validation = detector.validate_detections(detections)
         print(f"[CCCD Phase 1] Validation: {validation}")
+        
+        # Check if YOLO found enough regions
+        if not detections or validation.get("critical_count", 0) < 3:
+            print("⚠️  YOLO detection incomplete, using fallback OCR mode...")
+            return _fallback_full_image_ocr(image_array)
         
         # Extract text from each detected region
         extracted_regions = {}
@@ -136,16 +151,188 @@ def extract_cccd_regions_with_yolo(image_array: np.ndarray) -> Dict[str, Dict]:
         return {
             "success": len(extracted_regions) > 0,
             "regions": extracted_regions,
-            "validation": validation
+            "validation": validation,
+            "mode": "yolo_detected"
         }
     
     except Exception as e:
-        print(f"Error in YOLO detection: {e}")
+        print(f"⚠️  Error in YOLO detection: {e}")
+        print("🔄 Falling back to full-image OCR mode...")
+        return _fallback_full_image_ocr(image_array)
+
+
+def _fallback_full_image_ocr(image_array: np.ndarray) -> Dict[str, Dict]:
+    """
+    Fallback mode: Extract all text from image using PaddleOCR
+    Then use LLM to parse and locate fields
+    
+    This is used when YOLO detection fails or finds too few regions
+    
+    Args:
+        image_array: Input image
+    
+    Returns:
+        Dictionary with OCR results in similar format to YOLO mode
+    """
+    print("[CCCD Phase 1 Fallback] Using full-image OCR extraction...")
+    
+    try:
+        # Extract all text with position info
+        text_blocks = []
+        result = ocr_model.ocr(image_array, cls=True)
+        
+        if not result or result[0] is None:
+            return {
+                "success": False,
+                "regions": {},
+                "validation": {"is_valid": False, "error": "No text detected in image"},
+                "mode": "fallback_failed"
+            }
+        
+        # Process all detected text blocks
+        h, w = image_array.shape[:2]
+        
+        for line in result[0]:
+            box = line[0]
+            text = line[1][0].strip()
+            conf = line[1][1]
+            
+            if not text:
+                continue
+            
+            # Get bounding box
+            x_coords = [pt[0] for pt in box]
+            y_coords = [pt[1] for pt in box]
+            x1, x2 = int(min(x_coords)), int(max(x_coords))
+            y1, y2 = int(min(y_coords)), int(max(y_coords))
+            
+            text_blocks.append({
+                "text": text,
+                "conf": conf,
+                "bbox": (x1, y1, x2, y2),
+                "y_pos": y1,
+                "region_image": image_array[max(0, y1):min(h, y2), max(0, x1):min(w, x2)].copy()
+            })
+        
+        if not text_blocks:
+            return {
+                "success": False,
+                "regions": {},
+                "validation": {"is_valid": False, "error": "No text blocks extracted"},
+                "mode": "fallback_failed"
+            }
+        
+        # Sort by position (top to bottom)
+        text_blocks.sort(key=lambda x: x['y_pos'])
+        
+        # Create pseudo-regions by clustering text blocks
+        # Group text blocks into logical fields based on position
+        extracted_regions = _cluster_text_blocks_into_fields(text_blocks, image_array)
+        
+        print(f"📊 Extracted {len(extracted_regions)} field clusters from fallback OCR")
+        
+        return {
+            "success": len(extracted_regions) > 0,
+            "regions": extracted_regions,
+            "validation": {
+                "is_valid": len(extracted_regions) > 3,
+                "detected_count": len(extracted_regions),
+                "warning": "Using fallback full-image OCR (YOLO detection failed)"
+            },
+            "mode": "fallback_ocr"
+        }
+    
+    except Exception as e:
+        print(f"❌ Error in fallback OCR: {e}")
         return {
             "success": False,
             "regions": {},
-            "validation": {"is_valid": False, "error": str(e)}
+            "validation": {"is_valid": False, "error": f"Fallback OCR failed: {str(e)}"},
+            "mode": "fallback_failed"
         }
+
+
+def _cluster_text_blocks_into_fields(text_blocks: list, image_array: np.ndarray) -> Dict[str, Dict]:
+    """
+    Cluster OCR text blocks into logical CCCD fields
+    Uses spatial positioning and text characteristics
+    
+    Args:
+        text_blocks: List of extracted text blocks with positions
+        image_array: Original image for region extraction
+    
+    Returns:
+        Dictionary mapping field names to extracted data
+    """
+    h, w = image_array.shape[:2]
+    extracted_regions = {}
+    
+    # Simple heuristic: Sort by vertical position and estimate which field each block belongs to
+    # CCCD layout (typically):
+    # Top: Name, ID number
+    # Middle: Gender, DoB, Nationality
+    # Bottom: Dates, Address fields
+    
+    # Calculate image thirds for rough field positioning
+    third_h = h // 3
+    two_third_h = 2 * h // 3
+    
+    for idx, block in enumerate(text_blocks):
+        y_pos = block['bbox'][1]
+        text = block['text']
+        
+        # Skip very short text or numbers-only blocks that might be noise
+        if len(text) < 2:
+            continue
+        
+        # Estimate field type based on position and text characteristics
+        field_type = None
+        
+        if y_pos < third_h:
+            # Top section: Name or ID
+            if any(c.isdigit() for c in text) and len(re.sub(r'\D', '', text)) >= 9:
+                field_type = "id"
+            else:
+                field_type = "name"
+        elif y_pos < two_third_h:
+            # Middle section: Gender, DoB, Nationality
+            if any(c.isdigit() for c in text) and ('/' in text or len(re.sub(r'\D', '', text)) >= 6):
+                field_type = "dob"
+            elif text.lower() in ['nam', 'nữ', 'nam', 'nq']:
+                field_type = "gender"
+            else:
+                field_type = "nationality"
+        else:
+            # Bottom section: Addresses, dates
+            if '/' in text and any(c.isdigit() for c in text):
+                field_type = "expire_date"
+            elif len(text) > 10:
+                # Longer text = address
+                field_type = "current_place" if "thường" in text.lower() else "origin_place"
+        
+        # If we already have this field, merge the text
+        if field_type and field_type in extracted_regions:
+            # Merge with existing region (for multi-line fields)
+            existing = extracted_regions[field_type]
+            existing["raw_text"] += " " + text
+            # Expand bbox to include new text
+            x1, y1, x2, y2 = existing["bbox"]
+            new_x1, new_y1, new_x2, new_y2 = block["bbox"]
+            existing["bbox"] = (
+                min(x1, new_x1), min(y1, new_y1),
+                max(x2, new_x2), max(y2, new_y2)
+            )
+            existing["yolo_confidence"] = (existing.get("yolo_confidence", 0.7) + block["conf"]) / 2
+        elif field_type:
+            # Create new region entry
+            extracted_regions[field_type] = {
+                "raw_text": text,
+                "bbox": block["bbox"],
+                "yolo_confidence": block["conf"],
+                "region_image": block["region_image"]
+            }
+    
+    return extracted_regions
 
 
 def extract_raw_text_from_cccd(image_array) -> str:
@@ -192,7 +379,7 @@ def parse_cccd_with_llm(regions_data: Dict[str, Dict]) -> Dict[str, Any]:
     
     Args:
         regions_data: Output from extract_cccd_regions_with_yolo()
-            Contains OCR results from YOLO-detected regions
+            Contains OCR results from YOLO-detected regions or fallback full-image OCR
     
     Returns:
         Parsed CCCD data with validation
@@ -207,8 +394,14 @@ def parse_cccd_with_llm(regions_data: Dict[str, Dict]) -> Dict[str, Any]:
             "data": None
         }
     
+    # Get extraction mode (for context in LLM)
+    extraction_mode = regions_data.get("mode", "yolo_detected")
+    mode_note = ""
+    if extraction_mode == "fallback_ocr":
+        mode_note = " [⚠️ Fallback OCR mode - data may be incomplete or mixed. Please be careful with interpretation.]"
+    
     # Build context from detected regions with field names
-    region_context = ""
+    region_context = f"EXTRACTION MODE: {extraction_mode}{mode_note}\n\n"
     region_mapping = {
         'name': 'Họ tên (Full Name)',
         'dob': 'Ngày sinh (Date of Birth)',
@@ -234,14 +427,16 @@ def parse_cccd_with_llm(regions_data: Dict[str, Dict]) -> Dict[str, Any]:
     system_prompt = """
 You are an expert Vietnamese ID Card (CCCD) data extraction expert.
 
-You receive OCR text extracted from YOLO-detected regions of a CCCD.
+You receive OCR text extracted from regions of a CCCD.
 Your task is to parse and structure this information into standardized fields.
 
-CRITICAL: Some regions are MERGED from multiple detections (marked with [MERGED])
-This is normal and expected for address fields that span multiple lines.
-Always RECONSTRUCT the COMPLETE ADDRESS by combining all detected text.
+IMPORTANT CONTEXT: If the source is in "fallback_ocr" mode, the data comes from full-image OCR,
+not from YOLO region detection. This means:
+- Fields may be incomplete or mixed with neighboring fields
+- Text might be out of order
+- You need to be more intelligent in interpreting context
 
-IMPORTANT FIELD MAPPING (from YOLO detection - these are the ONLY fields to extract):
+CRITICAL FIELD MAPPING:
 - name: Họ tên (Full Name in UPPERCASE)
 - dob: Ngày sinh → date_of_birth (DD/MM/YYYY format)
 - gender: Giới tính → gender (Nam or Nữ)
@@ -254,44 +449,46 @@ IMPORTANT FIELD MAPPING (from YOLO detection - these are the ONLY fields to extr
 CRITICAL PARSING RULES:
 1. NAME: Preserve spaces and Vietnamese diacritics EXACTLY
    Example: "NGÔMINH TRÍ" → "NGÔ MINH TRÍ"
+   - Always UPPERCASE
+   - Proper spacing between words
    
 2. ID: Must be 12 or 9 continuous digits (remove ALL non-digit characters)
-
+   Example: "083205005215" or "083205005"
+   - NEVER include spaces, hyphens, or other characters
+   
 3. DATES: Must be DD/MM/YYYY format exactly
    Example: "31/07/2005"
-
+   - If date is in different format, convert it
+   - Validate dates make sense (dob usually 18+ years ago, expiration usually 10 years from issue)
+   
 4. GENDER: Only "Nam" or "Nữ"
-
+   - Accept common variations: "Male"→"Nam", "Female"→"Nữ"
+   
 5. ADDRESSES (MOST CRITICAL):
-   - native_place and current_place MUST be COMPLETE with all details
-   - For MERGED regions: Combine text from all detected regions into one complete address
-   - DO NOT TRUNCATE or shorten addresses
-   - Include street number, street name, ward, district, city/province
+   - native_place and current_place MUST be COMPLETE
+   - Include all hierarchical levels: street/number, ward, district, city/province
    - Normalize spacing: separate components with ", " (comma + space)
    - PRESERVE all Vietnamese diacritics (á, à, ả, ã, ạ, ă, â, ê, ô, ơ, ư, etc.)
+   - Common abbreviations: Ấp, TT. (Thị trấn), TP. (Thành phố), Tỉnh, Huyện, Xã
    
    EXAMPLES:
-   - "78/1, ấp Thạnh Hòa A, TT. Thạnh Phú, Thạnh Phú, Bến Tre"
+   - "78/1, Ấp Thạnh Hòa A, TT. Thạnh Phú, Thạnh Phú, Bến Tre"
    - "Phú Khánh, Thạnh Phú, Bến Tre"
-   - "135/25/8A Phạm Đ.Giảng, Bình Hưng Hòa, Bình Tân, TP. HCM"
-   
-   DO NOT return:
-   - "78/1, Ấp Thanh" (INCOMPLETE - missing Hòa A, TT. Thạnh Phú, Thạnh Phú, Bến Tre)
-   - "Phú Khánh, Thanh Phú, Bến Tre" (WRONG DIACRITICS - should be "Thạnh" not "Thanh")
+   - "135/25/8A, Phạm Đ.Giảng, Bình Hưng Hòa, Bình Tân, TP. HCM"
 
 DIACRITICS PRESERVATION:
-- Vietnamese uses combining marks and special characters: á, à, ả, ã, ạ, ă, â, ê, ô, ơ, ư, đ
+- Vietnamese uses: á, à, ả, ã, ạ, ă, ằ, ắ, ẳ, ẵ, ặ, â, ầ, ấ, ẩ, ẫ, ậ, è, é, ẻ, ẽ, ẹ, ê, ề, ế, ể, ễ, ệ, etc.
 - NEVER remove or simplify diacritics
-- If OCR shows "Thanh" but context suggests address, check for "Thạnh"
-- Preserve Ấp, TT., TP., all special abbreviations exactly
+- If OCR shows "Thanh" but context suggests "Thạnh", use "Thạnh"
+- Preserve all special markings exactly
 
-CONFIDENCE SCORING RULES:
+CONFIDENCE SCORING:
 - 1.0 = perfect OCR, completely certain
 - 0.9+ = very good OCR, minor uncertainty
-- 0.8-0.9 = decent OCR, some errors but clear meaning
-- 0.7-0.8 = moderate OCR quality, multiple interpretations
-- < 0.7 = poor OCR, unreliable
-- For merged regions: Average confidence of all regions involved
+- 0.8-0.9 = decent OCR, some errors
+- 0.7-0.8 = moderate quality, multiple interpretations
+- < 0.7 = poor quality, unreliable
+- If source is fallback_ocr: generally lower confidence (0.6-0.8 typical)
 
 RESPONSE FORMAT (STRICT JSON ONLY):
 {
@@ -317,26 +514,17 @@ RESPONSE FORMAT (STRICT JSON ONLY):
     "notes": "Any issues or clarifications"
 }
 
-VALIDATION CHECKLIST:
-□ All field names match the required 8 fields exactly
-□ Name has proper spacing (not concatenated)
-□ ID has exactly 9 or 12 digits
-□ Dates are DD/MM/YYYY format
-□ Addresses are COMPLETE (not truncated)
-□ All Vietnamese diacritics preserved
-□ No markdown or explanations outside JSON
-
 IMPORTANT NOTES:
-- Only extract the 8 fields listed above (no extra fields)
-- If a field cannot be read with confidence >= 0.6, set confidence to that value
-- Always return valid JSON only. No markdown or explanations outside JSON.
-- For merged regions: DO NOT discard parts, include ALL detected text
-- For address fields: If text seems incomplete, it's likely because OCR missed it - be thorough
-- Preserve Vietnamese diacritical marks in ALL fields without exception
+- Only return the 8 fields listed above (no extra fields)
+- If a field cannot be read with confidence >= 0.5, set confidence lower
+- Return valid JSON ONLY. No markdown, explanations, or text outside JSON.
+- For fields with uncertainty: Lower the confidence score, don't fabricate data
+- If address seems incomplete, note it in "notes" field
+- Validate ID format before returning (9 or 12 digits)
     """
 
     try:
-        chat_completion = groq_client.chat.completions.create(
+        chat_completion = get_groq_client().chat.completions.create(
             messages=[
                 {"role": "system", "content": system_prompt},
                 {"role": "user", "content": f"YOLO Detected Regions (OCR results):\n\n{region_context}"}

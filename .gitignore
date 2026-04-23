@@ -7,7 +7,6 @@ env/
 
 # Environment Variables
 .env
-.env.*
 *.local
 
 # =========================================
@@ -74,6 +73,8 @@ pnpm-debug.log*
 lerna-debug.log*
 coverage/
 .nyc_output/
+playwright-report/
+test-results/
 
 # Python test & coverage
 .pytest_cache/
@@ -107,3 +108,4 @@ htmlcov/
 !.vscode/tasks.json
 !.vscode/launch.json
 !.vscode/extensions.json
+web-fe/tsconfig.app.json

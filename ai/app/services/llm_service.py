@@ -4,7 +4,23 @@ from groq import Groq
 from app.core.config import settings
 from typing import List, Dict
 
-client = Groq(api_key=settings.GROQ_API_KEY)
+# Lazy initialization - only create client when needed
+_client = None
+
+def get_groq_client() -> Groq:
+    """
+    Get or create Groq client (lazy initialization)
+    This avoids initialization errors in test environment if GROQ_API_KEY is not set
+    """
+    global _client
+    if _client is None:
+        try:
+            _client = Groq(api_key=settings.GROQ_API_KEY)
+        except Exception as e:
+            print(f"⚠️  Warning: Could not initialize Groq client: {e}")
+            raise
+    return _client
+
 
 # --- CHÚ Ý TÊN HÀM Ở ĐÂY PHẢI LÀ summarize_to_json ---
 def summarize_to_json(text: str) -> List[Dict]:
@@ -38,6 +54,7 @@ def summarize_to_json(text: str) -> List[Dict]:
     """
 
     try:
+        client = get_groq_client()
         chat_completion = client.chat.completions.create(
             messages=[
                 {"role": "system", "content": system_prompt},
