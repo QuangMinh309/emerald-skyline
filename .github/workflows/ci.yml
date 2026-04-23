@@ -335,7 +335,6 @@ jobs:
             echo "- PR: unit + integration"
             echo "- main: coverage gate from Vitest config (>=35%)"
           } >> "$GITHUB_STEP_SUMMARY"
-
   frontend-e2e:
     name: E2E Frontend (Playwright)
     needs: [changes, frontend-tests]
