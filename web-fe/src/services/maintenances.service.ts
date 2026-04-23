@@ -117,7 +117,7 @@ export const completeIncidentTicket = async (
 	}
 	const res = await axiosInstance.post(
 		`/maintenance-tickets/incident/${id}/complete`,
-		data,
+		formData,
 		{
 			headers: { "Content-Type": "multipart/form-data" },
 		},
