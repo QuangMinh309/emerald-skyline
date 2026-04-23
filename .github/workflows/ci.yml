@@ -246,6 +246,131 @@ jobs:
               | awk '{print "| " $2 " | " $1 " |"}'
           } >> "$GITHUB_STEP_SUMMARY"
 
+  frontend-tests:
+    name: Test Frontend (Unit + Integration/Coverage)
+    needs: [changes, code-quality]
+    if: needs.changes.outputs.web == 'true'
+    runs-on: ubuntu-latest
+
+    defaults:
+      run:
+        working-directory: web-fe
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: "npm"
+          cache-dependency-path: web-fe/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: PR gate (fast)
+        if: github.event_name == 'pull_request'
+        run: |
+          npm run test:unit
+          npm run test:integration
+
+      - name: Main gate (coverage >= 35%)
+        if: github.ref == 'refs/heads/main'
+        run: npm run test:coverage
+
+      - name: Frontend test summary
+        if: always()
+        run: |
+          {
+            echo "### Frontend Test Gate"
+            echo ""
+            echo "- Event: ${{ github.event_name }}"
+            echo "- Ref: ${{ github.ref_name }}"
+            echo "- PR: unit + integration"
+            echo "- main: coverage gate from Vitest config (>=35%)"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+  mobile-tests:
+    name: Test Mobile (Unit + Integration/Coverage)
+    needs: [changes, code-quality]
+    if: needs.changes.outputs.mobile == 'true'
+    runs-on: ubuntu-latest
+
+    defaults:
+      run:
+        working-directory: mobile-fe
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: "npm"
+          cache-dependency-path: mobile-fe/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: PR gate (fast)
+        if: github.event_name == 'pull_request'
+        run: |
+          npm run test:unit
+          npm run test:integration
+
+      - name: Main gate (coverage >= 35%)
+        if: github.ref == 'refs/heads/main'
+        run: npm run test:coverage
+
+      - name: Mobile test summary
+        if: always()
+        run: |
+          {
+            echo "### Mobile Test Gate"
+            echo ""
+            echo "- Event: ${{ github.event_name }}"
+            echo "- Ref: ${{ github.ref_name }}"
+            echo "- PR: unit + integration"
+            echo "- main: coverage gate from Vitest config (>=35%)"
+          } >> "$GITHUB_STEP_SUMMARY"
+  frontend-e2e:
+    name: E2E Frontend (Playwright)
+    needs: [changes, frontend-tests]
+    if: github.ref == 'refs/heads/main' && needs.changes.outputs.web == 'true'
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: "npm"
+          cache-dependency-path: |
+            package-lock.json
+            web-fe/package-lock.json
+
+      - name: Install dependencies
+        run: |
+          npm ci
+          cd web-fe && npm ci
+
+      - name: Install Playwright browser
+        run: npm run e2e:install
+
+      - name: Run E2E tests
+        run: npm run e2e
+
+      - name: Upload Playwright report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report
+          path: playwright-report/
+
   framework-metric-tests:
     name: Framework Metric Tests (Inline)
     needs: [changes, code-quality]
@@ -577,7 +702,7 @@ jobs:
 
   deploy-frontend:
     name: Deploy Frontend to Vercel
-    needs: [changes, build-frontend, code-quality, framework-metric-tests]
+    needs: [changes, build-frontend, frontend-tests, frontend-e2e, code-quality, framework-metric-tests]
     if: github.ref == 'refs/heads/main' && needs.changes.outputs.web == 'true'
     runs-on: ubuntu-latest
     steps:

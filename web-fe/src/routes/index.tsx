@@ -9,7 +9,7 @@ import DetailResidentPage from "@/pages/Residents/detail-resident";
 import BlocksPage from "@/pages/Blocks/view-blocks";
 import CreateBlockPage from "@/pages/Blocks/create-block";
 import UpdateBlockPage from "@/pages/Blocks/update-block";
-// import DetailNotificationPage from "@/pages/Notifications/detail-notification";
+import DetailNotificationPage from "@/pages/Notifications/detail-notification";
 import DetailBlockPage from "@/pages/Blocks/detail-block";
 import DetailApartmentPage from "@/pages/Apartments/detail-apartment";
 import ApartmentsPage from "@/pages/Apartments/view-apartments";
@@ -18,24 +18,24 @@ import UpdateVotingPage from "@/pages/Votings/update-voting";
 import DetailVotingPage from "@/pages/Votings/detail-voting";
 import InvoicesPage from "@/pages/Invoices/view-invoices";
 import DetailInvoicePage from "@/pages/Invoices/detail-invoice";
-// import TechniciansPage from "@/pages/Technicians/view-technicians";
-// import DetailTechnicianPage from "@/pages/Technicians/detail-technician";
-// import MaintenancesPage from "@/pages/Maintenances/view-maintenances";
-// import DetailMaintenancePage from "@/pages/Maintenances/detail-maintenance";
-// import IssuesPage from "@/pages/Issues/view-issues";
-// import DetailIssuePage from "@/pages/Issues/detail-issue";
+import TechniciansPage from "@/pages/Technicians/view-technicians";
+import DetailTechnicianPage from "@/pages/Technicians/detail-technician";
+import MaintenancesPage from "@/pages/Maintenances/view-maintenances";
+import DetailMaintenancePage from "@/pages/Maintenances/detail-maintenance";
+import IssuesPage from "@/pages/Issues/view-issues";
+import DetailIssuePage from "@/pages/Issues/detail-issue";
 import FeesPage from "@/pages/Fees/view-fees";
 import DetailFeePage from "@/pages/Fees/detail-fee";
 import AccountsPage from "@/pages/Accounts/view-accounts";
 import DetailAccountPage from "@/pages/Accounts/detail-account";
 
 const Assets = lazy(() => import("@/pages/Assets/view-assets"));
-// const Notifications = lazy(
-// 	() => import("@/pages/Notifications/view-notifications"),
-// );
-// const SystemNotifications = lazy(() => import("@/pages/SystemNotifications"));
+const Notifications = lazy(
+	() => import("@/pages/Notifications/view-notifications"),
+);
+const SystemNotifications = lazy(() => import("@/pages/SystemNotifications"));
 const Services = lazy(() => import("@/pages/Services"));
-// const Report = lazy(() => import("@/pages/Report"));
+const Report = lazy(() => import("@/pages/Report"));
 const DetailServicePage = lazy(() => import("@/pages/Services/DetailService"));
 const Login = lazy(() => import("@/pages/Login"));
 const ForgotPassword = lazy(() => import("@/pages/ForgotPassword"));
@@ -79,33 +79,33 @@ export const routes = createBrowserRouter([
 				),
 			},
 
-			// // Notifications - ADMIN & TECHNICIAN
-			// {
-			// 	path: "notifications",
-			// 	element: (
-			// 		<RoleBasedRoute allowedRoles={["ADMIN", "TECHNICIAN"]}>
-			// 			<Notifications />
-			// 		</RoleBasedRoute>
-			// 	),
-			// },
-			// {
-			// 	path: "notifications/:id",
-			// 	element: (
-			// 		<RoleBasedRoute allowedRoles={["ADMIN", "TECHNICIAN"]}>
-			// 			<DetailNotificationPage />
-			// 		</RoleBasedRoute>
-			// 	),
-			// },
+			// Notifications - ADMIN & TECHNICIAN
+			{
+				path: "notifications",
+				element: (
+					<RoleBasedRoute allowedRoles={["ADMIN", "TECHNICIAN"]}>
+						<Notifications />
+					</RoleBasedRoute>
+				),
+			},
+			{
+				path: "notifications/:id",
+				element: (
+					<RoleBasedRoute allowedRoles={["ADMIN", "TECHNICIAN"]}>
+						<DetailNotificationPage />
+					</RoleBasedRoute>
+				),
+			},
 
-			// // System Notifications - ADMIN & TECHNICIAN
-			// {
-			// 	path: "system-notifications",
-			// 	element: (
-			// 		<RoleBasedRoute allowedRoles={["ADMIN", "TECHNICIAN"]}>
-			// 			<SystemNotifications />
-			// 		</RoleBasedRoute>
-			// 	),
-			// },
+			// System Notifications - ADMIN & TECHNICIAN
+			{
+				path: "system-notifications",
+				element: (
+					<RoleBasedRoute allowedRoles={["ADMIN", "TECHNICIAN"]}>
+						<SystemNotifications />
+					</RoleBasedRoute>
+				),
+			},
 
 			// // Residents - ADMIN only
 			{
@@ -143,15 +143,15 @@ export const routes = createBrowserRouter([
 				),
 			},
 
-			// // Reports - ADMIN only
-			// {
-			// 	path: "reports",
-			// 	element: (
-			// 		<RoleBasedRoute allowedRoles={["ADMIN"]}>
-			// 			<Report />
-			// 		</RoleBasedRoute>
-			// 	),
-			// },
+			// Reports - ADMIN only
+			{
+				path: "reports",
+				element: (
+					<RoleBasedRoute allowedRoles={["ADMIN"]}>
+						<Report />
+					</RoleBasedRoute>
+				),
+			},
 
 			// // Blocks - ADMIN only
 			{
@@ -276,58 +276,58 @@ export const routes = createBrowserRouter([
 			},
 
 			// // Technicians - ADMIN only
-			// {
-			// 	path: "technicians",
-			// 	element: (
-			// 		<RoleBasedRoute allowedRoles={["ADMIN"]}>
-			// 			<TechniciansPage />
-			// 		</RoleBasedRoute>
-			// 	),
-			// },
-			// {
-			// 	path: "technicians/:id",
-			// 	element: (
-			// 		<RoleBasedRoute allowedRoles={["ADMIN"]}>
-			// 			<DetailTechnicianPage />
-			// 		</RoleBasedRoute>
-			// 	),
-			// },
+			{
+				path: "technicians",
+				element: (
+					<RoleBasedRoute allowedRoles={["ADMIN"]}>
+						<TechniciansPage />
+					</RoleBasedRoute>
+				),
+			},
+			{
+				path: "technicians/:id",
+				element: (
+					<RoleBasedRoute allowedRoles={["ADMIN"]}>
+						<DetailTechnicianPage />
+					</RoleBasedRoute>
+				),
+			},
 
 			// // Issues/Requests - ADMIN & TECHNICIAN
-			// {
-			// 	path: "issues",
-			// 	element: (
-			// 		<RoleBasedRoute allowedRoles={["ADMIN", "TECHNICIAN"]}>
-			// 			<IssuesPage />
-			// 		</RoleBasedRoute>
-			// 	),
-			// },
-			// {
-			// 	path: "issues/:id",
-			// 	element: (
-			// 		<RoleBasedRoute allowedRoles={["ADMIN", "TECHNICIAN"]}>
-			// 			<DetailIssuePage />
-			// 		</RoleBasedRoute>
-			// 	),
-			// },
+			{
+				path: "issues",
+				element: (
+					<RoleBasedRoute allowedRoles={["ADMIN", "TECHNICIAN"]}>
+						<IssuesPage />
+					</RoleBasedRoute>
+				),
+			},
+			{
+				path: "issues/:id",
+				element: (
+					<RoleBasedRoute allowedRoles={["ADMIN", "TECHNICIAN"]}>
+						<DetailIssuePage />
+					</RoleBasedRoute>
+				),
+			},
 
-			// // Maintenances - ADMIN & TECHNICIAN
-			// {
-			// 	path: "maintenances",
-			// 	element: (
-			// 		<RoleBasedRoute allowedRoles={["ADMIN", "TECHNICIAN"]}>
-			// 			<MaintenancesPage />
-			// 		</RoleBasedRoute>
-			// 	),
-			// },
-			// {
-			// 	path: "maintenances/:id",
-			// 	element: (
-			// 		<RoleBasedRoute allowedRoles={["ADMIN", "TECHNICIAN"]}>
-			// 			<DetailMaintenancePage />
-			// 		</RoleBasedRoute>
-			// 	),
-			// },
+			// Maintenances - ADMIN & TECHNICIAN
+			{
+				path: "maintenances",
+				element: (
+					<RoleBasedRoute allowedRoles={["ADMIN", "TECHNICIAN"]}>
+						<MaintenancesPage />
+					</RoleBasedRoute>
+				),
+			},
+			{
+				path: "maintenances/:id",
+				element: (
+					<RoleBasedRoute allowedRoles={["ADMIN", "TECHNICIAN"]}>
+						<DetailMaintenancePage />
+					</RoleBasedRoute>
+				),
+			},
 
 			// Profile - all authenticated users
 			{ path: "profile", element: <ProfilePage /> },
